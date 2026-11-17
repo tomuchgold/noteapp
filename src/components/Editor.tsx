@@ -31,6 +31,8 @@ interface Props {
   actionSignal: { type: string; n: number; items?: MacroItem[] } | null;
   /** 编辑器样式设置 */
   settings: EditorSettings;
+  /** Ctrl/⌘ + 滚轮缩放字体（dir: 1 放大 / -1 缩小） */
+  onZoom?: (dir: 1 | -1) => void;
 }
 
 const languageComp = new Compartment();
@@ -67,15 +69,17 @@ function styleTheme(s: EditorSettings) {
   });
 }
 
-export default function Editor({ content, languagePath, onChange, onCursor, actionSignal, settings }: Props) {
+export default function Editor({ content, languagePath, onChange, onCursor, actionSignal, settings, onZoom }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onCursorRef = useRef(onCursor);
+  const onZoomRef = useRef(onZoom);
   const switchingRef = useRef(false);
 
   onChangeRef.current = onChange;
   onCursorRef.current = onCursor;
+  onZoomRef.current = onZoom;
 
   // 初始化 EditorView（只挂载一次）
   useEffect(() => {
@@ -126,7 +130,15 @@ export default function Editor({ content, languagePath, onChange, onCursor, acti
       }),
     });
     viewRef.current = view;
+    // Ctrl/⌘ + 滚轮 缩放字体
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      onZoomRef.current?.(e.deltaY < 0 ? 1 : -1);
+    };
+    hostRef.current.addEventListener("wheel", onWheel, { passive: false });
     return () => {
+      hostRef.current?.removeEventListener("wheel", onWheel);
       view.destroy();
       viewRef.current = null;
     };

@@ -18,7 +18,7 @@ import {
   getRecent,
   openDirectoryDialog,
 } from "./lib/files";
-import { loadSettings, saveSettings, type EditorSettings } from "./lib/settings";
+import { clampSettings, loadSettings, saveSettings, type EditorSettings } from "./lib/settings";
 import {
   VIRTUAL,
   filterFiles,
@@ -77,6 +77,11 @@ export default function App() {
   const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => loadSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => saveSettings(editorSettings), [editorSettings]);
+  const zoomEditor = useCallback((dir: 1 | -1) => {
+    setEditorSettings((s) =>
+      clampSettings({ ...s, fontSize: s.fontSize + dir * 1 })
+    );
+  }, []);
 
   // ---------- 文件夹浏览 ----------
   const [folderRoot, setFolderRoot] = useState<string | null>(() => loadSavedFolder());
@@ -603,6 +608,7 @@ export default function App() {
               onCursor={(line, col, selected) => setCursor({ line, col, selected })}
               actionSignal={actionSignal}
               settings={editorSettings}
+              onZoom={zoomEditor}
             />
           )
         )}
