@@ -196,3 +196,68 @@ pub fn list_dir(path: String) -> Result<Vec<DirEntry>, String> {
     });
     Ok(entries)
 }
+
+/// 文件大小查询（打开前判断是否进入大文件模式）
+#[derive(Serialize, Deserialize)]
+pub struct FileInfo {
+    pub size: u64,
+}
+
+#[tauri::command]
+pub fn file_info(path: String) -> Result<FileInfo, String> {
+    let meta = fs::metadata(&path).map_err(|e| format!("读取文件信息失败：{}", e))?;
+    Ok(FileInfo { size: meta.len() })
+}
+
+/// 分块读取：从 offset 起读 length 字节，按 UTF-8 容错解码。
+/// 用于大文件模式（>8MB），避免一次性把整个文件读进内存。
+#[tauri::command]
+pub fn read_file_chunk(path: String, offset: u64, length: u64) -> Result<String, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = fs::File::open(&path).map_err(|e| format!("打开失败：{}", e))?;
+    let total = file.metadata().map(|m| m.len()).map_err(|e| e.to_string())?;
+    if offset >= total {
+        return Ok(String::new());
+    }
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|e| format!("定位失败：{}", e))?;
+    let want = length.min(total - offset) as usize;
+    let mut buf = vec![0u8; want];
+    let mut read = 0usize;
+    while read < want {
+        match file.read(&mut buf[read..]) {
+            Ok(0) => break,
+            Ok(n) => read += n,
+            Err(e) => return Err(format!("读取失败：{}", e)),
+        }
+    }
+    buf.truncate(read);
+
+    // 块首若落在 UTF-8 续字节上，跳到字符边界
+    let mut start = 0usize;
+    while start < buf.len() && (buf[start] & 0xC0) == 0x80 {
+        start += 1;
+    }
+    // 块尾若截断多字节字符，回退到完整字符
+    let mut end = buf.len();
+    let mut back = 0;
+    while end > start && back < 4 && (buf[end - 1] & 0xC0) == 0x80 {
+        end -= 1;
+        back += 1;
+    }
+    if end > start && back < 4 {
+        // 检查末尾字符是否完整（简单校验：能解码即为完整）
+        if std::str::from_utf8(&buf[start..end]).is_err() && end > start {
+            let mut e = end;
+            while e > start {
+                e -= 1;
+                if (buf[e] & 0xC0) != 0x80 && std::str::from_utf8(&buf[start..e]).is_ok() {
+                    end = e;
+                    break;
+                }
+            }
+        }
+    }
+
+    Ok(String::from_utf8_lossy(&buf[start..end]).to_string())
+}

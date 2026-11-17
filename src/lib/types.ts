@@ -15,6 +15,10 @@ export interface FileTab {
   encoding: string; // UTF-8 / GBK / UTF-16LE / UTF-16BE
   bom: boolean;
   eol: "LF" | "CRLF" | "MIXED";
+  /** 大文件模式（只读，分块加载） */
+  large?: { total: number; loaded: number };
+  /** 是否只读 */
+  readOnly?: boolean;
 }
 
 /** read_file 命令返回 */

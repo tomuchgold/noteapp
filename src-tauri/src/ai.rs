@@ -163,3 +163,223 @@ pub async fn ai_models(base_url: String, api_key: String) -> Result<Vec<String>,
     }
     Ok(models)
 }
+
+#[derive(Clone, Serialize)]
+pub struct AiChunk {
+    /// 请求标识，前端用它对上自己的监听
+    pub id: String,
+    pub delta: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct AiStreamEnd {
+    pub id: String,
+    pub model: String,
+    pub tokens: Option<u64>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct AiStreamError {
+    pub id: String,
+    pub message: String,
+}
+
+/// 流式对话：通过 SSE 逐段 emit `ai://chunk`，结束时 emit `ai://done`
+#[tauri::command]
+pub async fn ai_chat_stream(
+    app: tauri::AppHandle,
+    id: String,
+    req: AiChatRequest,
+) -> Result<(), String> {
+    use futures_util::StreamExt;
+    use tauri::Emitter;
+
+    if req.base_url.trim().is_empty() {
+        return Err("未配置 API 地址（Base URL）".into());
+    }
+    if req.api_key.trim().is_empty() {
+        return Err("未配置 API Key，请到「AI 设置」中填写".into());
+    }
+
+    let body = serde_json::json!({
+        "model": req.model,
+        "messages": req
+            .messages
+            .iter()
+            .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
+            .collect::<Vec<_>>(),
+        "temperature": req.temperature,
+        "stream": true
+    });
+
+    let resp = client()?
+        .post(endpoint(&req.base_url, "chat/completions"))
+        .bearer_auth(req.api_key.trim())
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败：{}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        let msg = format!("HTTP {}：{}", status.as_u16(), truncate(&text, 400));
+        let _ = app.emit(
+            "ai://error",
+            AiStreamError {
+                id: id.clone(),
+                message: msg.clone(),
+            },
+        );
+        return Err(msg);
+    }
+
+    let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
+    let mut tokens: Option<u64> = None;
+
+    while let Some(chunk) = stream.next().await {
+        let bytes = match chunk {
+            Ok(b) => b,
+            Err(e) => {
+                let msg = format!("读取流失败：{}", e);
+                let _ = app.emit(
+                    "ai://error",
+                    AiStreamError {
+                        id: id.clone(),
+                        message: msg.clone(),
+                    },
+                );
+                return Err(msg);
+            }
+        };
+        buf.push_str(&String::from_utf8_lossy(&bytes));
+
+        while let Some(pos) = buf.find('\n') {
+            let line: String = buf.drain(..=pos).collect();
+            let line = line.trim();
+            let Some(data) = line.strip_prefix("data:") else {
+                continue;
+            };
+            let data = data.trim();
+            if data == "[DONE]" {
+                let _ = app.emit(
+                    "ai://done",
+                    AiStreamEnd {
+                        id: id.clone(),
+                        model: req.model.clone(),
+                        tokens,
+                    },
+                );
+                return Ok(());
+            }
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(data) else {
+                continue;
+            };
+            if let Some(t) = v["usage"]["total_tokens"].as_u64() {
+                tokens = Some(t);
+            }
+            if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
+                if !delta.is_empty() {
+                    let _ = app.emit(
+                        "ai://chunk",
+                        AiChunk {
+                            id: id.clone(),
+                            delta: delta.to_string(),
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    let _ = app.emit(
+        "ai://done",
+        AiStreamEnd {
+            id: id.clone(),
+            model: req.model.clone(),
+            tokens,
+        },
+    );
+    Ok(())
+}
+
+// ---------- 更新检查 ----------
+
+#[derive(Serialize)]
+pub struct UpdateInfo {
+    pub current: String,
+    pub latest: String,
+    pub newer: bool,
+    pub url: String,
+    pub notes: String,
+    pub published_at: String,
+}
+
+fn ver_parts(v: &str) -> Vec<u64> {
+    v.trim_start_matches('v')
+        .split(['.', '-'])
+        .map(|p| p.parse::<u64>().unwrap_or(0))
+        .collect()
+}
+
+fn is_newer(latest: &str, current: &str) -> bool {
+    let a = ver_parts(latest);
+    let b = ver_parts(current);
+    for i in 0..a.len().max(b.len()) {
+        let x = a.get(i).copied().unwrap_or(0);
+        let y = b.get(i).copied().unwrap_or(0);
+        if x != y {
+            return x > y;
+        }
+    }
+    false
+}
+
+/// 检查最新版本。api_url 默认 GitHub Releases API（私有仓库需传 token）
+#[tauri::command]
+pub async fn check_update(
+    current: String,
+    api_url: Option<String>,
+    token: Option<String>,
+) -> Result<UpdateInfo, String> {
+    let url = api_url.unwrap_or_else(|| {
+        "https://api.github.com/repos/tomuchgold/noteapp/releases/latest".to_string()
+    });
+    let mut rb = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?
+        .get(&url)
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "NotePP");
+    if let Some(t) = token {
+        if !t.trim().is_empty() {
+            rb = rb.bearer_auth(t.trim());
+        }
+    }
+    let resp = rb.send().await.map_err(|e| format!("请求失败：{}", e))?;
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!("HTTP {}：{}", status.as_u16(), truncate(&text, 300)));
+    }
+    let v: serde_json::Value =
+        serde_json::from_str(&text).map_err(|_| format!("响应不是合法 JSON：{}", truncate(&text, 200)))?;
+    let latest = v["tag_name"]
+        .as_str()
+        .or_else(|| v["version"].as_str())
+        .unwrap_or("")
+        .to_string();
+    if latest.is_empty() {
+        return Err("响应中缺少 tag_name 字段".into());
+    }
+    Ok(UpdateInfo {
+        newer: is_newer(&latest, &current),
+        current,
+        latest,
+        url: v["html_url"].as_str().unwrap_or("https://github.com/tomuchgold/noteapp/releases").to_string(),
+        notes: v["body"].as_str().unwrap_or("").chars().take(2000).collect(),
+        published_at: v["published_at"].as_str().unwrap_or("").to_string(),
+    })
+}

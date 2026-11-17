@@ -1,6 +1,7 @@
 /** AI 能力：多厂商配置（OpenAI 兼容协议）+ 选中文本动作 */
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export type ProviderId =
   | "deepseek"
@@ -244,6 +245,52 @@ export async function runAiAction(
       temperature: 0.3,
     },
   });
+}
+
+/** 流式版本：边收边回调，返回完整文本（失败抛错） */
+export async function runAiActionStream(
+  config: AiConfig,
+  action: AiAction,
+  text: string,
+  custom: string | undefined,
+  onDelta: (delta: string) => void
+): Promise<AiCallResult> {
+  const cfg = resolveConfig(config);
+  if (!cfg.baseUrl.trim()) throw new Error("未配置 API 地址，请打开「AI 设置」");
+  if (providerPreset(config.active).needKey && !cfg.apiKey.trim())
+    throw new Error("未配置 API Key，请打开「AI 设置」");
+  if (!cfg.model.trim()) throw new Error("未配置模型名称，请打开「AI 设置」");
+
+  const id = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let acc = "";
+  let tokens: number | undefined;
+
+  const unChunk = await listen<{ id: string; delta: string }>("ai://chunk", (e) => {
+    if (e.payload.id !== id) return;
+    acc += e.payload.delta;
+    onDelta(e.payload.delta);
+  });
+  const unDone = await listen<{ id: string; model: string; tokens?: number }>("ai://done", (e) => {
+    if (e.payload.id !== id) return;
+    if (e.payload.tokens) tokens = e.payload.tokens;
+  });
+
+  try {
+    await invoke("ai_chat_stream", {
+      id,
+      req: {
+        base_url: cfg.baseUrl,
+        api_key: cfg.apiKey,
+        model: cfg.model,
+        messages: buildMessages(action, text, custom),
+        temperature: 0.3,
+      },
+    });
+    return { content: acc, model: cfg.model, tokens };
+  } finally {
+    unChunk();
+    unDone();
+  }
 }
 
 export async function fetchModels(baseUrl: string, apiKey: string): Promise<string[]> {

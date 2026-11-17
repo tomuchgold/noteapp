@@ -69,3 +69,13 @@ export interface DirEntryInfo {
 export function listDir(path: string): Promise<DirEntryInfo[]> {
   return invoke("list_dir", { path });
 }
+
+/** 文件大小（打开前判断是否进入大文件模式） */
+export function fileInfo(path: string): Promise<{ size: number }> {
+  return invoke("file_info", { path });
+}
+
+/** 分块读取（大文件模式）：从 offset 起读 length 字节 */
+export function readFileChunk(path: string, offset: number, length: number): Promise<string> {
+  return invoke("read_file_chunk", { path, offset, length });
+}

@@ -13,19 +13,23 @@ import Splitter from "./components/Splitter";
 import AiSettingsDialog from "./components/AiSettingsDialog";
 import AiResultDialog from "./components/AiResultDialog";
 import AiCustomDialog from "./components/AiCustomDialog";
+import UpdateDialog from "./components/UpdateDialog";
+import { checkUpdate, type UpdateInfo } from "./lib/update";
 import {
   AI_ACTIONS,
   isConfigured,
   loadAiConfig,
   resolveConfig,
-  runAiAction,
+  runAiActionStream,
   saveAiConfig,
   type AiAction,
   type AiConfig,
 } from "./lib/ai";
 import {
+  fileInfo,
   openFileDialog,
   pushRecent,
+  readFileChunk,
   readTextFile,
   saveFileDialog,
   writeTextFile,
@@ -69,6 +73,18 @@ function baseName(path: string): string {
 
 const ENCODINGS = ["UTF-8", "GBK"];
 const SESSION_KEY = "notepp.session";
+
+/** 字节 → 人类可读（大文件模式横幅用） */
+function fmtMB(bytes: number) {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** 超过该大小进入大文件模式（只读 + 分块加载） */
+const LARGE_FILE_LIMIT = 8 * 1024 * 1024;
+/** 每次加载的字节数 */
+const LARGE_FILE_CHUNK = 1024 * 1024;
 
 export default function App() {
   const [tabs, setTabs] = useState<FileTab[]>([]);
@@ -141,9 +157,11 @@ export default function App() {
       const title = AI_ACTIONS.find((a) => a.id === action)?.label ?? "AI 操作";
       setAiJob({ title, action, source, custom, loading: true, error: null, result: "" });
       try {
-        const res = await runAiAction(aiConfig, action, source, custom);
+        const res = await runAiActionStream(aiConfig, action, source, custom, (delta) => {
+          setAiJob((j) => (j ? { ...j, loading: false, result: (j.result ?? "") + delta } : j));
+        });
         setAiJob((j) =>
-          j ? { ...j, loading: false, result: res.content, model: res.model, tokens: res.tokens } : j
+          j ? { ...j, loading: false, result: res.content || j.result, model: res.model, tokens: res.tokens } : j
         );
       } catch (e) {
         setAiJob((j) =>
@@ -168,6 +186,35 @@ export default function App() {
     },
     [aiReady, runAi]
   );
+
+  // ---------- 列编辑模式 ----------
+  const [columnMode, setColumnMode] = useState(() => localStorage.getItem("notepp.column-mode") === "1");
+  useEffect(() => {
+    localStorage.setItem("notepp.column-mode", columnMode ? "1" : "0");
+  }, [columnMode]);
+
+  // ---------- 更新检查 ----------
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const doCheckUpdate = useCallback(async () => {
+    setUpdateChecking(true);
+    setUpdateError(null);
+    try {
+      const info = await checkUpdate();
+      setUpdateInfo(info);
+    } catch (e) {
+      setUpdateError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setUpdateChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void doCheckUpdate();
+  }, [doCheckUpdate]);
 
   const writeAiText = useCallback((mode: "ai-replace" | "ai-insert", text: string) => {
     actionCount.current += 1;
@@ -208,6 +255,28 @@ export default function App() {
       return;
     }
     try {
+      const { size } = await fileInfo(path);
+      if (size > LARGE_FILE_LIMIT) {
+        const first = await readFileChunk(path, 0, LARGE_FILE_CHUNK);
+        pushRecent(path);
+        setRecent(getRecent());
+        setLibrary((prev) => upsertFile(prev, path, first));
+        const tab: FileTab = {
+          id: newId(),
+          path,
+          name: `${baseName(path)}（大文件）`,
+          content: first,
+          dirty: false,
+          encoding: "UTF-8",
+          bom: false,
+          eol: "LF",
+          readOnly: true,
+          large: { total: size, loaded: Math.min(size, LARGE_FILE_CHUNK) },
+        };
+        setTabs((ts) => [...ts, tab]);
+        setActiveId(tab.id);
+        return;
+      }
       const res = await readTextFile(path);
       pushRecent(path);
       setRecent(getRecent());
@@ -228,6 +297,22 @@ export default function App() {
       alert(`打开文件失败：${e}`);
     }
   }, [tabs]);
+
+  /** 大文件模式：追加下一块 */
+  const loadMoreChunk = useCallback(async () => {
+    const t = activeTab;
+    if (!t?.large || !t.path) return;
+    try {
+      const step = Math.min(LARGE_FILE_CHUNK, t.large.total - t.large.loaded);
+      const next = await readFileChunk(t.path, t.large.loaded, step);
+      updateTab(t.id, {
+        content: t.content + next,
+        large: { total: t.large.total, loaded: t.large.loaded + step },
+      });
+    } catch (e) {
+      alert(`加载失败：${e}`);
+    }
+  }, [activeTab, updateTab]);
 
   const newTab = useCallback(() => {
     const n = tabs.filter((t) => t.path === null).length;
@@ -329,6 +414,10 @@ export default function App() {
 
   /** 保存；forceDialog 用于另存为。返回是否成功保存 */
   const saveTab = useCallback(async (tab: FileTab, forceDialog = false): Promise<boolean> => {
+    if (tab.readOnly) {
+      alert("大文件模式为只读，不支持保存。可用「另存为」导出已加载的部分。");
+      return false;
+    }
     let path = tab.path;
     if (!path || forceDialog) {
       const picked = await saveFileDialog(tab.name);
@@ -612,6 +701,23 @@ export default function App() {
           设置
         </button>
         <button
+          onClick={() => setColumnMode((v) => !v)}
+          className={columnMode ? "on" : ""}
+          title="列编辑模式：矩形选区 + 十字光标（Alt+拖拽也可多行同时编辑）"
+        >
+          列选
+        </button>
+        <button
+          onClick={() => {
+            setUpdateOpen(true);
+            void doCheckUpdate();
+          }}
+          className={updateInfo?.newer ? "on" : ""}
+          title={updateInfo?.newer ? `发现新版本 v${updateInfo.latest}` : "检查更新"}
+        >
+          更新
+        </button>
+        <button
           onClick={() => setAiSettingsOpen(true)}
           className={aiReady ? "on" : ""}
           title={aiReady ? `AI 已就绪：${resolveConfig(aiConfig).model}` : "配置 AI 服务商与 Key"}
@@ -732,7 +838,20 @@ export default function App() {
           </div>
         ) : (
           activeTab && (
-            <Editor
+            <>
+              {activeTab.large && (
+                <div className="large-banner">
+                  <span>
+                    大文件模式（只读）· 已加载 {fmtMB(activeTab.large.loaded)} / 共{" "}
+                    {fmtMB(activeTab.large.total)}
+                  </span>
+                  {activeTab.large.loaded < activeTab.large.total && (
+                    <button onClick={loadMoreChunk}>再加载 1MB</button>
+                  )}
+                  <span className="hint">分块读取，避免一次性载入占满内存</span>
+                </div>
+              )}
+              <Editor
               key={activeTab.id}
               content={activeTab.content}
               languagePath={activeTab.path}
@@ -744,7 +863,10 @@ export default function App() {
               onAiAction={handleAiAction}
               aiReady={aiReady}
               onOpenAiSettings={() => setAiSettingsOpen(true)}
+              readOnly={activeTab.readOnly}
+              columnMode={columnMode}
             />
+            </>
           )
         )}
       </div>
@@ -843,6 +965,17 @@ export default function App() {
             setAiCustom(null);
             void runAi("custom", src, instruction);
           }}
+        />
+      )}
+
+      {/* 检查更新 */}
+      {updateOpen && (
+        <UpdateDialog
+          checking={updateChecking}
+          error={updateError}
+          info={updateInfo}
+          onCheck={() => void doCheckUpdate()}
+          onClose={() => setUpdateOpen(false)}
         />
       )}
 

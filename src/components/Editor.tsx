@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { EditorState, Compartment, EditorSelection } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, highlightSpecialChars, highlightWhitespace } from "@codemirror/view";
+import {
+  EditorView,
+  keymap,
+  lineNumbers,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  drawSelection,
+  highlightSpecialChars,
+  highlightWhitespace,
+  crosshairCursor,
+} from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, cursorCharLeft, cursorCharRight, cursorLineUp, cursorLineDown, deleteCharBackward, deleteCharForward, insertNewlineAndIndent, insertTab } from "@codemirror/commands";
 import { bracketMatching, foldGutter, foldKeymap, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
@@ -40,6 +50,10 @@ interface Props {
   aiReady?: boolean;
   /** 打开 AI 设置 */
   onOpenAiSettings?: () => void;
+  /** 只读（大文件模式） */
+  readOnly?: boolean;
+  /** 列编辑模式（矩形选区 + 十字光标） */
+  columnMode?: boolean;
 }
 
 const languageComp = new Compartment();
@@ -49,6 +63,29 @@ const tabComp = new Compartment();
 const wrapComp = new Compartment();
 const wsComp = new Compartment();
 const activeLineComp = new Compartment();
+const editableComp = new Compartment();
+const colComp = new Compartment();
+
+/** 按起止坐标算出矩形选区（每行一个区间，多光标同步输入） */
+function buildColumnSelection(view: EditorView, ax: number, ay: number, bx: number, by: number) {
+  const start = view.posAtCoords({ x: ax, y: ay });
+  const cur = view.posAtCoords({ x: bx, y: by });
+  if (start == null || cur == null) return null;
+  const a = view.state.doc.lineAt(start);
+  const b = view.state.doc.lineAt(cur);
+  const c1 = Math.min(start - a.from, cur - b.from);
+  const c2 = Math.max(start - a.from, cur - b.from);
+  const l1 = Math.min(a.number, b.number);
+  const l2 = Math.max(a.number, b.number);
+  const ranges = [];
+  for (let n = l1; n <= l2; n++) {
+    const line = view.state.doc.line(n);
+    ranges.push(
+      EditorSelection.range(Math.min(line.from + c1, line.to), Math.min(line.from + c2, line.to))
+    );
+  }
+  return EditorSelection.create(ranges);
+}
 
 /** 亮色主题（自带背景，避免透出深色外壳） */
 const lightTheme = EditorView.theme(
@@ -87,6 +124,8 @@ export default function Editor({
   onAiAction,
   aiReady,
   onOpenAiSettings,
+  readOnly,
+  columnMode,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -108,6 +147,8 @@ export default function Editor({
       state: EditorState.create({
         doc: "",
         extensions: [
+          // 允许多选区：矩形（列）选区与多光标同步编辑的前提
+          EditorState.allowMultipleSelections.of(true),
           lineNumbers(),
           highlightActiveLineGutter(),
           highlightSpecialChars(),
@@ -118,6 +159,8 @@ export default function Editor({
           wsComp.of(settings.showWhitespace ? [highlightWhitespace()] : []),
           activeLineComp.of(settings.activeLine ? [highlightActiveLine()] : []),
           styleComp.of(styleTheme(settings)),
+          editableComp.of(EditorView.editable.of(!readOnly)),
+          colComp.of(columnMode ? [crosshairCursor()] : []),
           tabComp.of(EditorState.tabSize.of(settings.tabSize)),
           indentOnInput(),
           bracketMatching(),
@@ -202,6 +245,77 @@ export default function Editor({
     });
   }, [settings]);
 
+  // 只读 / 列编辑模式变化
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: [
+        editableComp.reconfigure(EditorView.editable.of(!readOnly)),
+        colComp.reconfigure(columnMode ? [crosshairCursor()] : []),
+      ],
+    });
+  }, [readOnly, columnMode]);
+
+  // 列编辑：自己接管拖拽，直接生成矩形多区间选区
+  useEffect(() => {
+    const host = hostRef.current;
+    const view = viewRef.current;
+    if (!host || !view || !columnMode) return;
+
+    let dragging = false;
+    let sx = 0;
+    let sy = 0;
+
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (!(e.target as HTMLElement).closest(".cm-content")) return;
+      // 彻底拦掉 CodeMirror 自身的选区手势
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      dragging = true;
+      sx = e.clientX;
+      sy = e.clientY;
+      view.focus();
+      const sel = buildColumnSelection(view, sx, sy, sx, sy);
+      if (sel) view.dispatch({ selection: sel });
+    };
+
+    const blockMouse = (e: MouseEvent) => {
+      if (!dragging) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      const sel = buildColumnSelection(view, sx, sy, e.clientX, e.clientY);
+      if (sel) view.dispatch({ selection: sel });
+    };
+
+    const onUp = (e: PointerEvent) => {
+      if (!dragging) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      const sel = buildColumnSelection(view, sx, sy, e.clientX, e.clientY);
+      if (sel) view.dispatch({ selection: sel });
+      dragging = false;
+    };
+
+    host.addEventListener("pointerdown", onDown, true);
+    host.addEventListener("mousedown", blockMouse, true);
+    window.addEventListener("pointermove", onMove, true);
+    window.addEventListener("pointerup", onUp, true);
+    return () => {
+      host.removeEventListener("pointerdown", onDown, true);
+      host.removeEventListener("mousedown", blockMouse, true);
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerup", onUp, true);
+    };
+  }, [columnMode]);
+
   // 外部动作（Ctrl+F 打开搜索面板等）
   useEffect(() => {
     if (!actionSignal) return;
@@ -274,6 +388,7 @@ export default function Editor({
   return (
     <div
       className="editor-host"
+      data-col={columnMode ? "1" : "0"}
       ref={hostRef}
       onContextMenu={handleContextMenu}
       onMouseDown={(e) => {

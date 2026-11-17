@@ -1,11 +1,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import pkg from "./package.json" with { type: "json" };
 
 // Tauri 预期的固定端口；环境变量由 tauri CLI 注入
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   plugins: [react()],
+  // 版本号来自 package.json，发版时只改一处
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // pnpm 符号链接可能让 CodeMirror 核心包被解析为两份模块（instanceof 失效），强制去重
   resolve: {
     dedupe: [
