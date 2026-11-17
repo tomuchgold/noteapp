@@ -4,6 +4,9 @@
 一套代码同时构建 **macOS (Apple Silicon)** / **Windows (x64)** / **Linux** 三端应用。
 
 ![平台](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
+[![三端构建](https://github.com/tomuchgold/noteapp/actions/workflows/build.yml/badge.svg)](https://github.com/tomuchgold/noteapp/actions/workflows/build.yml)
+
+> 仓库：https://github.com/tomuchgold/noteapp ｜ 安装包：见 Releases 或 Actions 构建产物
 
 ## 功能特性
 
@@ -30,7 +33,6 @@
 | `Ctrl/Cmd + F`         | 查找替换 |
 | `Ctrl/Cmd + W`         | 关闭标签 |
 | `Ctrl + Tab`           | 切换标签 |
-
 | `Ctrl + Shift + R`     | 录制宏 / 停止录制 |
 | `Ctrl + Shift + P`     | 回放宏 |
 
@@ -39,6 +41,8 @@
 ## 本地开发
 
 ```bash
+git clone https://github.com/tomuchgold/noteapp.git && cd noteapp
+
 # 前置依赖：
 #   Node.js 22+ / pnpm 10+ / Rust stable
 #   Linux: sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
@@ -76,7 +80,7 @@ notepp/
 │   ├── lib/                 # 语言检测、文件命令封装、类型
 │   └── styles/app.css
 ├── src-tauri/               # Rust 后端
-│   ├── src/lib.rs           # read_file / write_file 命令（编码检测与转码）
+│   ├── src/commands.rs      # read_text_file / write_text_file 命令（编码检测与转码）
 │   ├── capabilities/        # Tauri 2 权限清单
 │   ├── icons/               # 三端图标（icns / ico / png）
 │   └── tauri.conf.json
@@ -91,5 +95,5 @@ notepp/
 - [x] 宏录制与回放
 - [ ] 插件系统（类比 Notepad++ 插件生态）
 - [ ] 大文件模式（>100MB 分块加载）
-- [ ] 文件对比（Diff 视图）
 - [ ] 列编辑模式（Alt+拖拽块选）
+- [ ] 自动更新（内置升级检查）
