@@ -51,3 +51,21 @@ export async function openFileDialog(): Promise<string[] | null> {
 export async function saveFileDialog(defaultName: string): Promise<string | null> {
   return await save({ defaultPath: defaultName });
 }
+
+/** 系统选择文件夹对话框 */
+export async function openDirectoryDialog(): Promise<string | null> {
+  const res = await open({ directory: true, multiple: false });
+  return typeof res === "string" ? res : null;
+}
+
+/** 目录条目（list_dir 命令返回） */
+export interface DirEntryInfo {
+  name: string;
+  path: string;
+  is_dir: boolean;
+}
+
+/** 列出目录内容（目录在前、隐藏文件过滤） */
+export function listDir(path: string): Promise<DirEntryInfo[]> {
+  return invoke("list_dir", { path });
+}

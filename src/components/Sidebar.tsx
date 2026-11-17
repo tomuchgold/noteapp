@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CAT_COLORS, VIRTUAL, type Category, type LibraryFile } from "../lib/library";
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   onCreate: (name: string, color: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  /** 侧栏底部附加区（文件夹树等） */
+  children?: ReactNode;
 }
 
 const FIXED = [
@@ -26,6 +28,7 @@ export default function Sidebar({
   onCreate,
   onRename,
   onDelete,
+  children,
 }: Props) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -187,6 +190,7 @@ export default function Sidebar({
           <p className="side-hint">点击右上角 ＋ 新建分类，把文件归类管理</p>
         )}
       </div>
+      {children}
     </aside>
   );
 }

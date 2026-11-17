@@ -155,7 +155,6 @@ body {
 
 .editor-host .cm-editor {
   height: 100%;
-  font-size: 14px;
 }
 
 .editor-host .cm-editor.cm-focused {
@@ -850,4 +849,103 @@ body {
   height: 1px;
   background: var(--border);
   margin: 4px 2px;
+}
+
+/* ---------- 编辑器设置 ---------- */
+.modal.settings {
+  width: 380px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal.settings h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.setting-row label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.setting-row .dim {
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+.setting-row input[type="range"] {
+  width: 180px;
+  accent-color: var(--accent);
+}
+
+.setting-row select,
+.setting-row input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.setting-row select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  outline: none;
+  font-family: inherit;
+}
+
+/* ---------- 文件夹树 ---------- */
+.folder-section {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+
+.folder-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.folder-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tree-item {
+  padding-top: 3px;
+  padding-bottom: 3px;
+  font-size: 12.5px;
+}
+
+.tree-caret {
+  width: 10px;
+  flex: 0 0 10px;
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+
+.tree-icon {
+  width: 16px;
+  flex: 0 0 16px;
+  font-size: 11px;
+}
+
+.tree-loading {
+  font-size: 11px;
+  color: #5f646c;
+  padding: 3px 8px;
+}
+
+.danger-text {
+  color: #f0a2a8 !important;
 }

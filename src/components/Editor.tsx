@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import { EditorState, Compartment, EditorSelection } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, highlightSpecialChars } from "@codemirror/view";
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, highlightSpecialChars, highlightWhitespace } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, cursorCharLeft, cursorCharRight, cursorLineUp, cursorLineDown, deleteCharBackward, deleteCharForward, insertNewlineAndIndent, insertTab } from "@codemirror/commands";
 import { bracketMatching, foldGutter, foldKeymap, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { detectLanguage } from "../lib/lang";
+import type { EditorSettings } from "../lib/settings";
 import type { MacroItem } from "../lib/types";
 
 /** 宏回放：按键 → CodeMirror 命令 */
@@ -28,12 +29,45 @@ interface Props {
   onCursor: (line: number, col: number, selected: number) => void;
   /** 外部请求触发（如 Ctrl+F、宏回放） */
   actionSignal: { type: string; n: number; items?: MacroItem[] } | null;
+  /** 编辑器样式设置 */
+  settings: EditorSettings;
 }
 
 const languageComp = new Compartment();
 const themeComp = new Compartment();
+const styleComp = new Compartment();
+const tabComp = new Compartment();
+const wrapComp = new Compartment();
+const wsComp = new Compartment();
+const activeLineComp = new Compartment();
 
-export default function Editor({ content, languagePath, onChange, onCursor, actionSignal }: Props) {
+/** 亮色主题（自带背景，避免透出深色外壳） */
+const lightTheme = EditorView.theme(
+  {
+    "&": { backgroundColor: "#ffffff", color: "#1f2328" },
+    ".cm-gutters": { backgroundColor: "#f6f8fa", color: "#6a737d", border: "none" },
+    ".cm-activeLine": { backgroundColor: "#f0f4fa" },
+    ".cm-content": { caretColor: "#1f2328" },
+  },
+  { dark: false }
+);
+
+/** 字号 / 行高样式（随设置实时变化） */
+function themeExtensions(s: EditorSettings) {
+  return s.theme === "dark"
+    ? [oneDark, syntaxHighlighting(defaultHighlightStyle, { fallback: true })]
+    : [lightTheme, syntaxHighlighting(defaultHighlightStyle, { fallback: true })];
+}
+
+function styleTheme(s: EditorSettings) {
+  return EditorView.theme({
+    "&": { fontSize: `${s.fontSize}px` },
+    ".cm-scroller": { lineHeight: String(s.lineHeight) },
+    ".cm-gutters": { fontSize: `${Math.max(11, s.fontSize - 2)}px` },
+  });
+}
+
+export default function Editor({ content, languagePath, onChange, onCursor, actionSignal, settings }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -57,12 +91,15 @@ export default function Editor({ content, languagePath, onChange, onCursor, acti
           history(),
           foldGutter(),
           drawSelection(),
-          EditorView.lineWrapping,
+          wrapComp.of(settings.wrap ? [EditorView.lineWrapping] : []),
+          wsComp.of(settings.showWhitespace ? [highlightWhitespace()] : []),
+          activeLineComp.of(settings.activeLine ? [highlightActiveLine()] : []),
+          styleComp.of(styleTheme(settings)),
+          tabComp.of(EditorState.tabSize.of(settings.tabSize)),
           indentOnInput(),
           bracketMatching(),
           closeBrackets(),
           autocompletion(),
-          highlightActiveLine(),
           highlightSelectionMatches(),
           keymap.of([
             ...closeBracketsKeymap,
@@ -73,7 +110,7 @@ export default function Editor({ content, languagePath, onChange, onCursor, acti
             indentWithTab,
           ]),
           languageComp.of([]),
-          themeComp.of([oneDark, syntaxHighlighting(defaultHighlightStyle, { fallback: true })]),
+          themeComp.of(themeExtensions(settings)),
           EditorView.updateListener.of((u) => {
             if (switchingRef.current) return;
             if (u.docChanged) {
@@ -117,6 +154,22 @@ export default function Editor({ content, languagePath, onChange, onCursor, acti
       effects: languageComp.reconfigure(lang.ext ? [lang.ext] : []),
     });
   }, [languagePath]);
+
+  // 样式设置变化 → 实时重新配置
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: [
+        styleComp.reconfigure(styleTheme(settings)),
+        tabComp.reconfigure(EditorState.tabSize.of(settings.tabSize)),
+        wrapComp.reconfigure(settings.wrap ? [EditorView.lineWrapping] : []),
+        wsComp.reconfigure(settings.showWhitespace ? [highlightWhitespace()] : []),
+        activeLineComp.reconfigure(settings.activeLine ? [highlightActiveLine()] : []),
+        themeComp.reconfigure(themeExtensions(settings)),
+      ],
+    });
+  }, [settings]);
 
   // 外部动作（Ctrl+F 打开搜索面板等）
   useEffect(() => {

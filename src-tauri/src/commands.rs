@@ -160,3 +160,39 @@ pub fn write_text_file(req: WriteRequest) -> Result<(), String> {
     }
     fs::write(&req.path, out).map_err(|e| format!("写入失败：{}", e))
 }
+
+/// 目录条目（文件夹浏览树）
+#[derive(serde::Serialize)]
+pub struct DirEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+}
+
+/// 列出目录内容：目录在前、按名称排序；隐藏文件（. 开头）过滤
+#[tauri::command]
+pub fn list_dir(path: String) -> Result<Vec<DirEntry>, String> {
+    let rd = std::fs::read_dir(&path).map_err(|e| format!("读取目录失败：{}", e))?;
+    let mut entries: Vec<DirEntry> = Vec::new();
+    for item in rd.flatten() {
+        let name = item.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') {
+            continue;
+        }
+        let ft = match item.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        entries.push(DirEntry {
+            name,
+            path: item.path().to_string_lossy().to_string(),
+            is_dir: ft.is_dir(),
+        });
+    }
+    entries.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    Ok(entries)
+}

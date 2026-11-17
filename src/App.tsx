@@ -7,6 +7,8 @@ import DiffView from "./components/DiffView";
 import DiffDialog, { type DiffSource } from "./components/DiffDialog";
 import Sidebar from "./components/Sidebar";
 import FileList from "./components/FileList";
+import FolderTree, { loadSavedFolder } from "./components/FolderTree";
+import SettingsDialog from "./components/SettingsDialog";
 import {
   openFileDialog,
   pushRecent,
@@ -14,7 +16,9 @@ import {
   saveFileDialog,
   writeTextFile,
   getRecent,
+  openDirectoryDialog,
 } from "./lib/files";
+import { loadSettings, saveSettings, type EditorSettings } from "./lib/settings";
 import {
   VIRTUAL,
   filterFiles,
@@ -68,6 +72,14 @@ export default function App() {
   const [catKey, setCatKey] = useState<string>(VIRTUAL.all);
   const [query, setQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // ---------- 编辑器样式设置 ----------
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => loadSettings());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => saveSettings(editorSettings), [editorSettings]);
+
+  // ---------- 文件夹浏览 ----------
+  const [folderRoot, setFolderRoot] = useState<string | null>(() => loadSavedFolder());
 
   useEffect(() => saveLibrary(library), [library]);
   useEffect(() => saveCategories(categories), [categories]);
@@ -492,6 +504,9 @@ export default function App() {
         >
           侧栏
         </button>
+        <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置">
+          设置
+        </button>
         <span className="spacer" />
         {recent.length > 0 && (
           <select
@@ -520,7 +535,18 @@ export default function App() {
             onCreate={createCategory}
             onRename={renameCategory}
             onDelete={deleteCategory}
-          />
+          >
+            <FolderTree
+              root={folderRoot}
+              activePath={activeTab?.path ?? null}
+              onOpenFile={openPath}
+              onPickFolder={async () => {
+                const dir = await openDirectoryDialog();
+                if (dir) setFolderRoot(dir);
+              }}
+              onClear={() => setFolderRoot(null)}
+            />
+          </Sidebar>
         )}
         <FileList
           title={viewTitle}
@@ -576,6 +602,7 @@ export default function App() {
               onChange={(v) => updateTab(activeTab.id, { content: v, dirty: true })}
               onCursor={(line, col, selected) => setCursor({ line, col, selected })}
               actionSignal={actionSignal}
+              settings={editorSettings}
             />
           )
         )}
@@ -641,6 +668,15 @@ export default function App() {
           defaultA={activeId}
           onConfirm={startDiff}
           onCancel={() => setDiffDialog(false)}
+        />
+      )}
+
+      {/* 编辑器设置弹窗 */}
+      {settingsOpen && (
+        <SettingsDialog
+          value={editorSettings}
+          onChange={setEditorSettings}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
 
