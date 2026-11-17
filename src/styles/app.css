@@ -432,10 +432,10 @@ body {
   color: #fff;
 }
 
-/* 左侧分类栏 */
+/* 左侧分类栏（宽度由布局状态注入 --sidebar-w，可拖拽调整） */
 .sidebar {
-  width: 190px;
-  flex: 0 0 190px;
+  width: var(--sidebar-w, 190px);
+  flex: 0 0 var(--sidebar-w, 190px);
   background: #232529;
   border-right: 1px solid var(--border);
   display: flex;
@@ -621,15 +621,34 @@ body {
   color: #f0a2a8;
 }
 
-/* 中间文件列表 */
+/* 中间文件列表（宽度由布局状态注入 --filelist-w，可拖拽调整） */
 .filelist {
-  width: 264px;
-  flex: 0 0 264px;
+  width: var(--filelist-w, 264px);
+  flex: 0 0 var(--filelist-w, 264px);
   background: #212327;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* 面板间拖动条 */
+.splitter {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  touch-action: none;
+}
+
+.splitter:hover,
+.splitter[data-dragging="true"] {
+  background: var(--accent, #4c8dff);
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .filelist-head {

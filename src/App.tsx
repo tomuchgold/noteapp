@@ -9,6 +9,7 @@ import Sidebar from "./components/Sidebar";
 import FileList from "./components/FileList";
 import FolderTree, { loadSavedFolder } from "./components/FolderTree";
 import SettingsDialog from "./components/SettingsDialog";
+import Splitter from "./components/Splitter";
 import {
   openFileDialog,
   pushRecent,
@@ -18,6 +19,14 @@ import {
   getRecent,
   openDirectoryDialog,
 } from "./lib/files";
+import {
+  clampFilelistWidth,
+  clampSidebarWidth,
+  DEFAULT_LAYOUT,
+  loadLayout,
+  saveLayout,
+  type LayoutState,
+} from "./lib/layout";
 import { clampSettings, loadSettings, saveSettings, type EditorSettings } from "./lib/settings";
 import {
   VIRTUAL,
@@ -71,7 +80,12 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>(() => loadCategories());
   const [catKey, setCatKey] = useState<string>(VIRTUAL.all);
   const [query, setQuery] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // ---------- 三栏布局（显隐 + 宽度持久化） ----------
+  const [layout, setLayout] = useState<LayoutState>(() => loadLayout());
+  useEffect(() => saveLayout(layout), [layout]);
+  const patchLayout = useCallback((patch: Partial<LayoutState>) => {
+    setLayout((l) => ({ ...l, ...patch }));
+  }, []);
 
   // ---------- 编辑器样式设置 ----------
   const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => loadSettings());
@@ -395,9 +409,12 @@ export default function App() {
       } else if (key === "w") {
         e.preventDefault();
         if (activeId) closeTab(activeId);
+      } else if (key === "b" && e.shiftKey) {
+        e.preventDefault();
+        setLayout((l) => ({ ...l, filelistOpen: !l.filelistOpen }));
       } else if (key === "b") {
         e.preventDefault();
-        setSidebarOpen((v) => !v);
+        setLayout((l) => ({ ...l, sidebarOpen: !l.sidebarOpen }));
       } else if (key === "f") {
         e.preventDefault();
         actionCount.current += 1;
@@ -503,11 +520,18 @@ export default function App() {
           回放宏
         </button>
         <button
-          onClick={() => setSidebarOpen((v) => !v)}
-          className={sidebarOpen ? "on" : ""}
+          onClick={() => patchLayout({ sidebarOpen: !layout.sidebarOpen })}
+          className={layout.sidebarOpen ? "on" : ""}
           title="显示/隐藏侧栏 (Ctrl+B)"
         >
           侧栏
+        </button>
+        <button
+          onClick={() => patchLayout({ filelistOpen: !layout.filelistOpen })}
+          className={layout.filelistOpen ? "on" : ""}
+          title="显示/隐藏文件列表 (Ctrl+Shift+B)"
+        >
+          列表
         </button>
         <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置">
           设置
@@ -530,8 +554,16 @@ export default function App() {
         )}
       </div>
 
-      <div className="workspace">
-        {sidebarOpen && (
+      <div
+        className="workspace"
+        style={
+          {
+            "--sidebar-w": `${layout.sidebarWidth}px`,
+            "--filelist-w": `${layout.filelistWidth}px`,
+          } as React.CSSProperties
+        }
+      >
+        {layout.sidebarOpen && (
           <Sidebar
             categories={categories}
             files={library}
@@ -553,19 +585,37 @@ export default function App() {
             />
           </Sidebar>
         )}
-        <FileList
-          title={viewTitle}
-          files={viewFiles}
-          activePath={activeTab?.path ?? null}
-          query={query}
-          categories={categories}
-          onQuery={setQuery}
-          onOpen={openPath}
-          onToggleFav={toggleFav}
-          onAssign={assignCategory}
-          onRemove={removeFromLibrary}
-          onNewFile={newTab}
-        />
+        {layout.sidebarOpen && (
+          <Splitter
+            onDelta={(dx) =>
+              patchLayout({ sidebarWidth: clampSidebarWidth(layout.sidebarWidth + dx) })
+            }
+            onReset={() => patchLayout({ sidebarWidth: DEFAULT_LAYOUT.sidebarWidth })}
+          />
+        )}
+        {layout.filelistOpen && (
+          <FileList
+            title={viewTitle}
+            files={viewFiles}
+            activePath={activeTab?.path ?? null}
+            query={query}
+            categories={categories}
+            onQuery={setQuery}
+            onOpen={openPath}
+            onToggleFav={toggleFav}
+            onAssign={assignCategory}
+            onRemove={removeFromLibrary}
+            onNewFile={newTab}
+          />
+        )}
+        {layout.filelistOpen && (
+          <Splitter
+            onDelta={(dx) =>
+              patchLayout({ filelistWidth: clampFilelistWidth(layout.filelistWidth + dx) })
+            }
+            onReset={() => patchLayout({ filelistWidth: DEFAULT_LAYOUT.filelistWidth })}
+          />
+        )}
 
         <div className="main">
           <TabBar
