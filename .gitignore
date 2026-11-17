@@ -1,0 +1,13 @@
+# Node / 构建
+node_modules/
+dist/
+*.local
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
