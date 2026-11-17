@@ -5,6 +5,8 @@ import TabBar from "./components/TabBar";
 import StatusBar from "./components/StatusBar";
 import DiffView from "./components/DiffView";
 import DiffDialog, { type DiffSource } from "./components/DiffDialog";
+import Sidebar from "./components/Sidebar";
+import FileList from "./components/FileList";
 import {
   openFileDialog,
   pushRecent,
@@ -13,6 +15,19 @@ import {
   writeTextFile,
   getRecent,
 } from "./lib/files";
+import {
+  VIRTUAL,
+  filterFiles,
+  loadCategories,
+  loadLibrary,
+  patchFile,
+  removeFile,
+  saveCategories,
+  saveLibrary,
+  upsertFile,
+  type Category,
+  type LibraryFile,
+} from "./lib/library";
 import { detectLanguage } from "./lib/lang";
 import type { FileTab, MacroItem } from "./lib/types";
 
@@ -47,6 +62,29 @@ export default function App() {
   const actionCount = useRef(0);
   const sessionLoaded = useRef(false);
 
+  // ---------- 文件库 / 分类 ----------
+  const [library, setLibrary] = useState<LibraryFile[]>(() => loadLibrary());
+  const [categories, setCategories] = useState<Category[]>(() => loadCategories());
+  const [catKey, setCatKey] = useState<string>(VIRTUAL.all);
+  const [query, setQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => saveLibrary(library), [library]);
+  useEffect(() => saveCategories(categories), [categories]);
+
+  const viewFiles = useMemo(
+    () => filterFiles(library, catKey, query, categories),
+    [library, catKey, query, categories]
+  );
+
+  const viewTitle = useMemo(() => {
+    if (catKey === VIRTUAL.all) return "全部文件";
+    if (catKey === VIRTUAL.fav) return "收藏";
+    if (catKey === VIRTUAL.recent) return "最近";
+    if (catKey === VIRTUAL.none) return "未分类";
+    return categories.find((c) => c.id === catKey)?.name ?? "全部文件";
+  }, [catKey, categories]);
+
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeId) ?? null,
     [tabs, activeId]
@@ -67,6 +105,7 @@ export default function App() {
       const res = await readTextFile(path);
       pushRecent(path);
       setRecent(getRecent());
+      setLibrary((prev) => upsertFile(prev, path, res.content));
       const tab: FileTab = {
         id: newId(),
         path,
@@ -201,6 +240,7 @@ export default function App() {
       });
       pushRecent(path);
       setRecent(getRecent());
+      setLibrary((prev) => upsertFile(prev, path!, tab.content));
       setTabs((ts) =>
         ts.map((t) =>
           t.id === tab.id
@@ -238,6 +278,43 @@ export default function App() {
       }
     },
     [tabs, activeId]
+  );
+
+  // ---------- 文件库操作 ----------
+  const toggleFav = useCallback((path: string) => {
+    setLibrary((prev) => {
+      const f = prev.find((x) => x.path === path);
+      return patchFile(prev, path, { favorite: !f?.favorite });
+    });
+  }, []);
+
+  const assignCategory = useCallback((path: string, category: string | null) => {
+    setLibrary((prev) => patchFile(prev, path, { category }));
+  }, []);
+
+  const removeFromLibrary = useCallback((path: string) => {
+    setLibrary((prev) => removeFile(prev, path));
+  }, []);
+
+  const createCategory = useCallback((name: string, color: string) => {
+    const id = `cat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setCategories((prev) => [...prev, { id, name, color }]);
+    setCatKey(id);
+  }, []);
+
+  const renameCategory = useCallback((id: string, name: string) => {
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
+  }, []);
+
+  const deleteCategory = useCallback(
+    (id: string) => {
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      setLibrary((prev) =>
+        prev.map((f) => (f.category === id ? { ...f, category: null } : f))
+      );
+      setCatKey((k) => (k === id ? VIRTUAL.all : k));
+    },
+    []
   );
 
   // ---------- 宏录制与回放 ----------
@@ -301,6 +378,9 @@ export default function App() {
       } else if (key === "w") {
         e.preventDefault();
         if (activeId) closeTab(activeId);
+      } else if (key === "b") {
+        e.preventDefault();
+        setSidebarOpen((v) => !v);
       } else if (key === "f") {
         e.preventDefault();
         actionCount.current += 1;
@@ -405,6 +485,13 @@ export default function App() {
         >
           回放宏
         </button>
+        <button
+          onClick={() => setSidebarOpen((v) => !v)}
+          className={sidebarOpen ? "on" : ""}
+          title="显示/隐藏侧栏 (Ctrl+B)"
+        >
+          侧栏
+        </button>
         <span className="spacer" />
         {recent.length > 0 && (
           <select
@@ -423,12 +510,39 @@ export default function App() {
         )}
       </div>
 
-      <TabBar
-        tabs={tabs}
-        activeId={activeId}
-        onSelect={setActiveId}
-        onClose={closeTab}
-      />
+      <div className="workspace">
+        {sidebarOpen && (
+          <Sidebar
+            categories={categories}
+            files={library}
+            activeKey={catKey}
+            onSelect={setCatKey}
+            onCreate={createCategory}
+            onRename={renameCategory}
+            onDelete={deleteCategory}
+          />
+        )}
+        <FileList
+          title={viewTitle}
+          files={viewFiles}
+          activePath={activeTab?.path ?? null}
+          query={query}
+          categories={categories}
+          onQuery={setQuery}
+          onOpen={openPath}
+          onToggleFav={toggleFav}
+          onAssign={assignCategory}
+          onRemove={removeFromLibrary}
+          onNewFile={newTab}
+        />
+
+        <div className="main">
+          <TabBar
+            tabs={tabs}
+            activeId={activeId}
+            onSelect={setActiveId}
+            onClose={closeTab}
+          />
 
       <div
         className="editor-area"
@@ -480,6 +594,8 @@ export default function App() {
           path={activeTab.path}
         />
       )}
+        </div>
+      </div>
 
       {/* 未保存确认弹窗 */}
       {confirmState && (

@@ -7,9 +7,13 @@
 [![三端构建](https://github.com/tomuchgold/noteapp/actions/workflows/build.yml/badge.svg)](https://github.com/tomuchgold/noteapp/actions/workflows/build.yml)
 
 > 仓库：https://github.com/tomuchgold/noteapp ｜ 安装包：见 Releases 或 Actions 构建产物
+>
+> 📖 **安装说明**（macOS「已损坏」/ Windows SmartScreen 提示的解决办法）见 [docs/INSTALL.md](docs/INSTALL.md)
 
 ## 功能特性
 
+- ✅ 备忘录式三栏布局：左侧**分类侧栏** + 中间**文件列表** + 右侧编辑器，`Ctrl+B` 折叠侧栏
+- ✅ 文件分类管理：打开过的文件自动进入文件库，可新建分类（带颜色）、右键归类、收藏置顶、搜索过滤；所有数据本地持久化
 - ✅ 多标签编辑：多文件同时打开、`Ctrl+Tab` 切换、中键关闭、未保存 `●` 标记
 - ✅ 语法高亮：JS/TS/JSX/HTML/CSS/JSON/Markdown/Python/Rust/C/C++/Java/Go/SQL/XML/YAML/Shell/Lua/Pascal/Fortran/Perl/Ruby 等 25+ 语言，按扩展名自动识别
 - ✅ 编辑增强：行号、代码折叠、括号匹配/补全、自动缩进、当前行高亮、选区匹配高亮、多光标
@@ -61,6 +65,10 @@ pnpm tauri build   # 构建当前平台安装包
 | macOS (Apple Silicon) | `dmg/*.dmg`、`macos/*.app`         |
 | Windows               | `msi/*.msi`、`nsis/*.exe`          |
 | Linux                 | `deb/*.deb`、`appimage/*.AppImage` |
+
+## 安装常见问题
+
+macOS 首次打开提示「已损坏」、Windows SmartScreen 拦截均为未签名应用的标准提示，解决办法见 **[docs/INSTALL.md](docs/INSTALL.md)**。
 
 ## 三端打包（CI）
 
