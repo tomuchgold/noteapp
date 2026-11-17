@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorState, Compartment, EditorSelection } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, highlightSpecialChars, highlightWhitespace } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, cursorCharLeft, cursorCharRight, cursorLineUp, cursorLineDown, deleteCharBackward, deleteCharForward, insertNewlineAndIndent, insertTab } from "@codemirror/commands";
@@ -7,6 +7,7 @@ import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { detectLanguage } from "../lib/lang";
+import { AI_ACTIONS, type AiAction } from "../lib/ai";
 import type { EditorSettings } from "../lib/settings";
 import type { MacroItem } from "../lib/types";
 
@@ -27,12 +28,18 @@ interface Props {
   languagePath: string | null;
   onChange: (value: string) => void;
   onCursor: (line: number, col: number, selected: number) => void;
-  /** 外部请求触发（如 Ctrl+F、宏回放） */
-  actionSignal: { type: string; n: number; items?: MacroItem[] } | null;
+  /** 外部请求触发（如 Ctrl+F、宏回放、AI 结果写回） */
+  actionSignal: { type: string; n: number; items?: MacroItem[]; text?: string } | null;
   /** 编辑器样式设置 */
   settings: EditorSettings;
   /** Ctrl/⌘ + 滚轮缩放字体（dir: 1 放大 / -1 缩小） */
   onZoom?: (dir: 1 | -1) => void;
+  /** 选中文本后右键触发的 AI 动作（custom 时由上层弹指令输入） */
+  onAiAction?: (action: AiAction, text: string) => void;
+  /** 是否已配置 AI（未配置时菜单提示去设置） */
+  aiReady?: boolean;
+  /** 打开 AI 设置 */
+  onOpenAiSettings?: () => void;
 }
 
 const languageComp = new Compartment();
@@ -69,12 +76,24 @@ function styleTheme(s: EditorSettings) {
   });
 }
 
-export default function Editor({ content, languagePath, onChange, onCursor, actionSignal, settings, onZoom }: Props) {
+export default function Editor({
+  content,
+  languagePath,
+  onChange,
+  onCursor,
+  actionSignal,
+  settings,
+  onZoom,
+  onAiAction,
+  aiReady,
+  onOpenAiSettings,
+}: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onCursorRef = useRef(onCursor);
   const onZoomRef = useRef(onZoom);
+  const [aiMenu, setAiMenu] = useState<{ x: number; y: number; text: string } | null>(null);
   const switchingRef = useRef(false);
 
   onChangeRef.current = onChange;
@@ -217,10 +236,87 @@ export default function Editor({ content, languagePath, onChange, onCursor, acti
         selection: EditorSelection.range(0, view.state.doc.length),
         scrollIntoView: true,
       });
+    } else if (actionSignal.type === "ai-replace" && actionSignal.text !== undefined) {
+      const sel = view.state.selection.main;
+      view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: actionSignal.text },
+        selection: { anchor: sel.from + actionSignal.text.length },
+        scrollIntoView: true,
+      });
+    } else if (actionSignal.type === "ai-insert" && actionSignal.text !== undefined) {
+      const sel = view.state.selection.main;
+      view.dispatch({
+        changes: { from: sel.head, insert: actionSignal.text },
+        selection: { anchor: sel.head + actionSignal.text.length },
+        scrollIntoView: true,
+      });
     } else if (actionSignal.type === "goto") {
       // 跳到行（在 App 中解析）
     }
   }, [actionSignal]);
 
-  return <div className="editor-host" ref={hostRef} />;
+  // 右键：有选中内容时弹出 AI 动作菜单
+  function handleContextMenu(e: React.MouseEvent) {
+    const view = viewRef.current;
+    if (!view) return;
+    const sel = view.state.selection.main;
+    if (sel.empty) return; // 无选区 → 保留浏览器默认菜单
+    const text = view.state.sliceDoc(sel.from, sel.to);
+    if (!text.trim()) return;
+    e.preventDefault();
+    setAiMenu({
+      x: Math.min(e.clientX, window.innerWidth - 220),
+      y: Math.min(e.clientY, window.innerHeight - 300),
+      text,
+    });
+  }
+
+  return (
+    <div
+      className="editor-host"
+      ref={hostRef}
+      onContextMenu={handleContextMenu}
+      onMouseDown={(e) => {
+        if ((e.target as HTMLElement).closest(".ai-menu")) return;
+        setAiMenu(null);
+      }}
+    >
+      {aiMenu && (
+        <div
+          className="ai-menu"
+          style={{ left: aiMenu.x, top: aiMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="ai-menu-head">
+            AI 操作
+            <span className="ai-menu-sub">{aiMenu.text.length} 字符</span>
+          </div>
+          {!aiReady && (
+            <button
+              className="ai-menu-config"
+              onClick={() => {
+                setAiMenu(null);
+                onOpenAiSettings?.();
+              }}
+            >
+              尚未配置模型，点此设置 →
+            </button>
+          )}
+          {AI_ACTIONS.map((a) => (
+            <button
+              key={a.id}
+              disabled={!aiReady}
+              title={a.hint}
+              onClick={() => {
+                setAiMenu(null);
+                onAiAction?.(a.id, aiMenu.text);
+              }}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

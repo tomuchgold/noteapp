@@ -10,6 +10,19 @@ import FileList from "./components/FileList";
 import FolderTree, { loadSavedFolder } from "./components/FolderTree";
 import SettingsDialog from "./components/SettingsDialog";
 import Splitter from "./components/Splitter";
+import AiSettingsDialog from "./components/AiSettingsDialog";
+import AiResultDialog from "./components/AiResultDialog";
+import AiCustomDialog from "./components/AiCustomDialog";
+import {
+  AI_ACTIONS,
+  isConfigured,
+  loadAiConfig,
+  resolveConfig,
+  runAiAction,
+  saveAiConfig,
+  type AiAction,
+  type AiConfig,
+} from "./lib/ai";
 import {
   openFileDialog,
   pushRecent,
@@ -66,7 +79,12 @@ export default function App() {
     onDone: () => void;
   } | null>(null);
   const [recent, setRecent] = useState<string[]>(getRecent());
-  const [actionSignal, setActionSignal] = useState<{ type: string; n: number; items?: MacroItem[] } | null>(null);
+  const [actionSignal, setActionSignal] = useState<{
+    type: string;
+    n: number;
+    items?: MacroItem[];
+    text?: string;
+  } | null>(null);
   const [diff, setDiff] = useState<{ aText: string; bText: string; aName: string; bName: string } | null>(null);
   const [diffDialog, setDiffDialog] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -99,6 +117,63 @@ export default function App() {
 
   // ---------- 文件夹浏览 ----------
   const [folderRoot, setFolderRoot] = useState<string | null>(() => loadSavedFolder());
+
+  // ---------- AI ----------
+  const [aiConfig, setAiConfig] = useState<AiConfig>(() => loadAiConfig());
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [aiJob, setAiJob] = useState<{
+    title: string;
+    action: AiAction;
+    source: string;
+    custom?: string;
+    loading: boolean;
+    error: string | null;
+    result: string;
+    model?: string;
+    tokens?: number;
+  } | null>(null);
+  const [aiCustom, setAiCustom] = useState<{ source: string } | null>(null);
+  useEffect(() => saveAiConfig(aiConfig), [aiConfig]);
+  const aiReady = isConfigured(aiConfig);
+
+  const runAi = useCallback(
+    async (action: AiAction, source: string, custom?: string) => {
+      const title = AI_ACTIONS.find((a) => a.id === action)?.label ?? "AI 操作";
+      setAiJob({ title, action, source, custom, loading: true, error: null, result: "" });
+      try {
+        const res = await runAiAction(aiConfig, action, source, custom);
+        setAiJob((j) =>
+          j ? { ...j, loading: false, result: res.content, model: res.model, tokens: res.tokens } : j
+        );
+      } catch (e) {
+        setAiJob((j) =>
+          j ? { ...j, loading: false, error: String(e instanceof Error ? e.message : e) } : j
+        );
+      }
+    },
+    [aiConfig]
+  );
+
+  const handleAiAction = useCallback(
+    (action: AiAction, text: string) => {
+      if (!aiReady) {
+        setAiSettingsOpen(true);
+        return;
+      }
+      if (action === "custom") {
+        setAiCustom({ source: text });
+        return;
+      }
+      void runAi(action, text);
+    },
+    [aiReady, runAi]
+  );
+
+  const writeAiText = useCallback((mode: "ai-replace" | "ai-insert", text: string) => {
+    actionCount.current += 1;
+    setActionSignal({ type: mode, n: actionCount.current, text });
+    setAiJob(null);
+  }, []);
 
   useEffect(() => saveLibrary(library), [library]);
   useEffect(() => saveCategories(categories), [categories]);
@@ -536,6 +611,13 @@ export default function App() {
         <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置">
           设置
         </button>
+        <button
+          onClick={() => setAiSettingsOpen(true)}
+          className={aiReady ? "on" : ""}
+          title={aiReady ? `AI 已就绪：${resolveConfig(aiConfig).model}` : "配置 AI 服务商与 Key"}
+        >
+          AI
+        </button>
         <span className="spacer" />
         {recent.length > 0 && (
           <select
@@ -659,6 +741,9 @@ export default function App() {
               actionSignal={actionSignal}
               settings={editorSettings}
               onZoom={zoomEditor}
+              onAiAction={handleAiAction}
+              aiReady={aiReady}
+              onOpenAiSettings={() => setAiSettingsOpen(true)}
             />
           )
         )}
@@ -733,6 +818,48 @@ export default function App() {
           value={editorSettings}
           onChange={setEditorSettings}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {/* AI 设置弹窗 */}
+      {aiSettingsOpen && (
+        <AiSettingsDialog
+          config={aiConfig}
+          onSave={(c) => {
+            setAiConfig(c);
+            setAiSettingsOpen(false);
+          }}
+          onClose={() => setAiSettingsOpen(false)}
+        />
+      )}
+
+      {/* AI 自定义指令 */}
+      {aiCustom && (
+        <AiCustomDialog
+          source={aiCustom.source}
+          onClose={() => setAiCustom(null)}
+          onSubmit={(instruction) => {
+            const src = aiCustom.source;
+            setAiCustom(null);
+            void runAi("custom", src, instruction);
+          }}
+        />
+      )}
+
+      {/* AI 结果 */}
+      {aiJob && (
+        <AiResultDialog
+          title={aiJob.title}
+          source={aiJob.source}
+          loading={aiJob.loading}
+          error={aiJob.error}
+          result={aiJob.result}
+          model={aiJob.model}
+          tokens={aiJob.tokens}
+          onReplace={(t) => writeAiText("ai-replace", t)}
+          onInsert={(t) => writeAiText("ai-insert", t)}
+          onClose={() => setAiJob(null)}
+          onRetry={() => void runAi(aiJob.action, aiJob.source, aiJob.custom)}
         />
       )}
 

@@ -1,5 +1,6 @@
 //! NotePP — Tauri 后端入口。
 
+mod ai;
 mod commands;
 
 pub fn run() {
@@ -9,7 +10,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::read_text_file,
             commands::write_text_file,
-            commands::list_dir
+            commands::list_dir,
+            ai::ai_chat,
+            ai::ai_models
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
