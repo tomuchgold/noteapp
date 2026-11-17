@@ -1,11 +1,13 @@
 /**
- * 编辑器样式规则设置（看板：编辑器具体样式规则）
+ * 编辑器样式规则设置（v0.6 起持续扩充）
  * 持久化于 localStorage，实时应用到 CodeMirror。
  */
 
 export interface EditorSettings {
-  /** 正文字号 px（11–24） */
+  /** 正文字号 px（11–24，缩放前的基准字号） */
   fontSize: number;
+  /** 缩放百分比（25–300，Ctrl/⌘+滚轮调整，Ctrl+0 复位） */
+  zoom: number;
   /** 行高倍数（1.2–2.4） */
   lineHeight: number;
   /** Tab 宽度（空格数） */
@@ -16,19 +18,30 @@ export interface EditorSettings {
   showWhitespace: boolean;
   /** 当前行高亮 */
   activeLine: boolean;
-  /** 编辑器主题 */
-  theme: "dark" | "light";
+  /** 当前段落高亮（亮色背景，覆盖光标所在整段） */
+  paragraphHighlight: boolean;
+  /** 编辑器主题（主题注册表 id，内置或自定义） */
+  theme: string;
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
   fontSize: 14,
+  zoom: 100,
   lineHeight: 1.6,
   tabSize: 4,
   wrap: true,
   showWhitespace: false,
   activeLine: true,
+  paragraphHighlight: true,
   theme: "dark",
 };
+
+/** 缩放步进（百分比） */
+export const ZOOM_STEP = 10;
+export const ZOOM_MIN = 25;
+/** 缩放上限：放大到 900px（用户要求），按基准字号换算 */
+export const FONT_MAX_PX = 900;
+export const ZOOM_MAX = 6500;
 
 const KEY = "notepp.editor-settings";
 
@@ -56,11 +69,19 @@ export function clampSettings(s: EditorSettings): EditorSettings {
     Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fb;
   return {
     fontSize: clamp(Math.round(s.fontSize), 11, 24, DEFAULT_SETTINGS.fontSize),
+    zoom: clamp(Math.round(s.zoom), ZOOM_MIN, ZOOM_MAX, DEFAULT_SETTINGS.zoom),
     lineHeight: clamp(s.lineHeight, 1.2, 2.4, DEFAULT_SETTINGS.lineHeight),
     tabSize: [2, 4, 8].includes(s.tabSize) ? s.tabSize : 4,
     wrap: !!s.wrap,
     showWhitespace: !!s.showWhitespace,
     activeLine: !!s.activeLine,
-    theme: s.theme === "light" ? "light" : "dark",
+    paragraphHighlight: !!s.paragraphHighlight,
+    theme: typeof s.theme === "string" && s.theme ? s.theme : DEFAULT_SETTINGS.theme,
   };
+}
+
+/** 实际渲染字号（基准字号 × 缩放，上限 900px） */
+export function effectiveFontSize(s: EditorSettings): number {
+  const px = (s.fontSize * s.zoom) / 100;
+  return Math.round(Math.min(px, FONT_MAX_PX) * 10) / 10;
 }

@@ -79,3 +79,11 @@ export function fileInfo(path: string): Promise<{ size: number }> {
 export function readFileChunk(path: string, offset: number, length: number): Promise<string> {
   return invoke("read_file_chunk", { path, offset, length });
 }
+
+/**
+ * 拷贝媒体/附件文件到文档同目录 media/ 下（同名自动加序号），
+ * 返回相对引用路径 media/xxx.ext
+ */
+export function copyMediaFile(src: string, docPath: string): Promise<string> {
+  return invoke("copy_media_file", { src, docPath });
+}

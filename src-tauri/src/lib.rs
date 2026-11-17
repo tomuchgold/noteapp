@@ -14,6 +14,7 @@ pub fn run() {
             commands::list_dir,
             commands::file_info,
             commands::read_file_chunk,
+            commands::copy_media_file,
             ai::ai_chat,
             ai::ai_models,
             ai::ai_chat_stream,

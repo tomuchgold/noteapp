@@ -8,9 +8,11 @@ interface Props {
   eol: string;
   language: string;
   path: string | null;
+  /** 缩放百分比（点击复位 100%） */
+  zoom?: number;
 }
 
-export default function StatusBar({ line, col, selected, lines, encoding, bom, eol, language, path }: Props) {
+export default function StatusBar({ line, col, selected, lines, encoding, bom, eol, language, path, zoom }: Props) {
   const sizeText = path ? path : "未保存";
   return (
     <div className="statusbar">
@@ -22,6 +24,15 @@ export default function StatusBar({ line, col, selected, lines, encoding, bom, e
       <span className="status-item">共 {lines} 行</span>
       <span className="spacer" />
       <span className="status-item">{language}</span>
+      {typeof zoom === "number" && (
+        <span
+          className="status-item clickable"
+          title="Ctrl/⌘+滚轮缩放，Ctrl+0 复位 100%（点击复位）"
+          onClick={() => window.dispatchEvent(new CustomEvent("notepp.zoom-reset"))}
+        >
+          {zoom}%
+        </span>
+      )}
       <span
         className="status-item clickable"
         title="点击切换编码"

@@ -209,6 +209,43 @@ pub fn file_info(path: String) -> Result<FileInfo, String> {
     Ok(FileInfo { size: meta.len() })
 }
 
+/// 拷贝媒体/附件文件到文档同目录的 media/ 下，返回相对引用路径（media/xxx.ext）。
+/// 同名冲突时自动加序号（xxx-1.ext）。拖拽多媒体入编辑区时使用。
+#[tauri::command]
+pub fn copy_media_file(src: String, doc_path: String) -> Result<String, String> {
+    let src_path = Path::new(&src);
+    if !src_path.exists() {
+        return Err(format!("文件不存在：{}", src));
+    }
+    let doc_dir = Path::new(&doc_path)
+        .parent()
+        .ok_or_else(|| "无法确定文档目录".to_string())?;
+    let media_dir = doc_dir.join("media");
+    fs::create_dir_all(&media_dir).map_err(|e| format!("创建 media 目录失败：{}", e))?;
+
+    let name = src_path
+        .file_name()
+        .map(|n| n.to_os_string())
+        .ok_or_else(|| "无法获取文件名".to_string())?;
+    let file_stem = src_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "file".to_string());
+    let ext = src_path
+        .extension()
+        .map(|s| format!(".{}", s.to_string_lossy()))
+        .unwrap_or_default();
+
+    let mut dest = media_dir.join(&name);
+    let mut seq = 1;
+    while dest.exists() {
+        dest = media_dir.join(format!("{}-{}{}", file_stem, seq, ext));
+        seq += 1;
+    }
+    fs::copy(src_path, &dest).map_err(|e| format!("复制失败：{}", e))?;
+    Ok(format!("media/{}", dest.file_name().unwrap().to_string_lossy()))
+}
+
 /// 分块读取：从 offset 起读 length 字节，按 UTF-8 容错解码。
 /// 用于大文件模式（>8MB），避免一次性把整个文件读进内存。
 #[tauri::command]

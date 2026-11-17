@@ -10,6 +10,8 @@ import FileList from "./components/FileList";
 import FolderTree, { loadSavedFolder } from "./components/FolderTree";
 import SettingsDialog from "./components/SettingsDialog";
 import Splitter from "./components/Splitter";
+import InsertTableDialog from "./components/InsertTableDialog";
+import PreviewDialog from "./components/PreviewDialog";
 import AiSettingsDialog from "./components/AiSettingsDialog";
 import AiResultDialog from "./components/AiResultDialog";
 import AiCustomDialog from "./components/AiCustomDialog";
@@ -35,6 +37,7 @@ import {
   writeTextFile,
   getRecent,
   openDirectoryDialog,
+  copyMediaFile,
 } from "./lib/files";
 import {
   clampFilelistWidth,
@@ -44,7 +47,15 @@ import {
   saveLayout,
   type LayoutState,
 } from "./lib/layout";
-import { clampSettings, loadSettings, saveSettings, type EditorSettings } from "./lib/settings";
+import { clampSettings, effectiveFontSize, loadSettings, saveSettings, ZOOM_STEP, type EditorSettings } from "./lib/settings";
+import {
+  loadAnnotations,
+  newAnnotationId,
+  saveAnnotations,
+  type Annotation,
+  type AnnotationKind,
+} from "./lib/annotations";
+import { EXT_LANG } from "./lib/lang";
 import {
   VIRTUAL,
   filterFiles,
@@ -127,8 +138,11 @@ export default function App() {
   useEffect(() => saveSettings(editorSettings), [editorSettings]);
   const zoomEditor = useCallback((dir: 1 | -1) => {
     setEditorSettings((s) =>
-      clampSettings({ ...s, fontSize: s.fontSize + dir * 1 })
+      clampSettings({ ...s, zoom: s.zoom + dir * ZOOM_STEP })
     );
+  }, []);
+  const resetZoom = useCallback(() => {
+    setEditorSettings((s) => clampSettings({ ...s, zoom: 100 }));
   }, []);
 
   // ---------- 文件夹浏览 ----------
@@ -193,6 +207,7 @@ export default function App() {
     localStorage.setItem("notepp.column-mode", columnMode ? "1" : "0");
   }, [columnMode]);
 
+
   // ---------- 更新检查 ----------
   const [updateOpen, setUpdateOpen] = useState(false);
   const [updateChecking, setUpdateChecking] = useState(false);
@@ -246,6 +261,113 @@ export default function App() {
   const updateTab = useCallback((id: string, patch: Partial<FileTab>) => {
     setTabs((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
+
+  // ---------- 标注（划线/高亮/备注，按文件路径持久化） ----------
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const activePath = activeTab?.path ?? null;
+  useEffect(() => {
+    setAnnotations(activePath ? loadAnnotations(activePath) : []);
+  }, [activePath]);
+
+  const persistAnnotations = useCallback((list: Annotation[]) => {
+    setAnnotations(list);
+    if (activePath) saveAnnotations(activePath, list);
+  }, [activePath]);
+
+  const handleAnnotate = useCallback(
+    (a: { from: number; to: number; text: string; kind: AnnotationKind; color?: string; note?: string }) => {
+      const ann: Annotation = { id: newAnnotationId(), createdAt: Date.now(), ...a };
+      setAnnotations((prev) => {
+        const next = [...prev, ann];
+        if (activePath) saveAnnotations(activePath, next);
+        return next;
+      });
+    },
+    [activePath]
+  );
+
+  const handleDeleteAnnotation = useCallback(
+    (id: string) => {
+      setAnnotations((prev) => {
+        const next = prev.filter((x) => x.id !== id);
+        if (activePath) saveAnnotations(activePath, next);
+        return next;
+      });
+    },
+    [activePath]
+  );
+
+  // ---------- 插入表格 / Markdown 预览 ----------
+  const [tableOpen, setTableOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const insertText = useCallback((text: string) => {
+    actionCount.current += 1;
+    setActionSignal({ type: "insert-text", n: actionCount.current, text });
+  }, []);
+
+  const activeIsMarkdown = !!activeTab && (/\.(md|markdown)$/i.test(activeTab.name) || /\.(md|markdown)$/i.test(activeTab.path ?? ""));
+  void activeIsMarkdown; // 预览按钮对所有文档开放；保留标记供状态提示使用
+
+  const exportPreviewHtml = useCallback(async (html: string) => {
+    const name = (activeTab?.name ?? "文档").replace(/\.[^.]+$/, "") + ".html";
+    const picked = await saveFileDialog(name);
+    if (!picked) return;
+    try {
+      await writeTextFile({ path: picked, content: html, encoding: "UTF-8", bom: false, eol: "LF" });
+      pushRecent(picked);
+      setRecent(getRecent());
+    } catch (e) {
+      alert(`导出失败：${e}`);
+    }
+  }, [activeTab]);
+
+  // ---------- 拖拽多媒体/附件（引用插入） ----------
+  const MEDIA_IMG = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
+  const MEDIA_AUDIO = new Set(["mp3", "wav", "ogg", "flac", "m4a", "aac", "opus"]);
+  const MEDIA_VIDEO = new Set(["mp4", "webm", "mov", "avi", "mkv", "m4v"]);
+
+  const insertMedia = useCallback(
+    async (srcPath: string) => {
+      if (!activeTab) {
+        alert("请先新建或打开一个文档，再把媒体/附件拖进来。");
+        return;
+      }
+      if (!activeTab.path) {
+        alert("文档尚未保存。请先用 Ctrl+S 保存文档，媒体文件会复制到文档同目录的 media/ 文件夹下并以引用方式插入。");
+        return;
+      }
+      if (activeTab.readOnly) {
+        alert("大文件模式为只读，不支持插入媒体引用。");
+        return;
+      }
+      const file = baseName(srcPath);
+      const ext = (file.split(".").pop() ?? "").toLowerCase();
+      const stem = file.replace(/\.[^.]+$/, "");
+      try {
+        const rel = await copyMediaFile(srcPath, activeTab.path);
+        let snippet: string;
+        if (MEDIA_IMG.has(ext)) snippet = `![${stem}](${rel})`;
+        else if (MEDIA_AUDIO.has(ext)) snippet = `\n<audio controls src="${rel}"></audio>\n`;
+        else if (MEDIA_VIDEO.has(ext)) snippet = `\n<video controls width="480" src="${rel}"></video>\n`;
+        else snippet = `\n[📎 ${file}](${rel})\n`;
+        insertText(snippet);
+      } catch (e) {
+        alert(`导入媒体失败：${e}`);
+      }
+    },
+    [activeTab, insertText]
+  );
+
+  /** 判断拖入路径是当文本打开，还是作为媒体/附件插入引用 */
+  const isTextFilePath = (p: string): boolean => {
+    const ext = (p.split(/[\\/]/).pop()?.split(".").pop() ?? "").toLowerCase();
+    if (MEDIA_IMG.has(ext) || MEDIA_AUDIO.has(ext) || MEDIA_VIDEO.has(ext)) return false;
+    if (!ext) return true; // 无扩展名按文本处理
+    return ext in EXT_LANG; // 已知文本类型打开；其他（pdf/zip 等）当附件插入引用
+  };
+
+
 
   /** 打开单个路径（去重：已打开则激活） */
   const openPath = useCallback(async (path: string) => {
@@ -589,6 +711,10 @@ export default function App() {
       } else if (key === "p" && e.shiftKey) {
         e.preventDefault();
         replayMacro();
+      } else if (key === "0") {
+        // Ctrl+0 复位缩放 100%
+        e.preventDefault();
+        resetZoom();
       } else if (key === "tab") {
         e.preventDefault();
         if (tabs.length > 1 && activeId) {
@@ -620,20 +746,27 @@ export default function App() {
       );
     };
     window.addEventListener("notepp.cycle-encoding", onCycle);
-    return () => window.removeEventListener("notepp.cycle-encoding", onCycle);
-  }, [activeId]);
+    window.addEventListener("notepp.zoom-reset", resetZoom);
+    return () => {
+      window.removeEventListener("notepp.cycle-encoding", onCycle);
+      window.removeEventListener("notepp.zoom-reset", resetZoom);
+    };
+  }, [activeId, resetZoom]);
 
   // ---------- 拖拽打开文件 ----------
   useEffect(() => {
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "drop") {
-        for (const p of event.payload.paths) openPath(p);
+        for (const p of event.payload.paths) {
+          if (isTextFilePath(p)) openPath(p);
+          else void insertMedia(p);
+        }
       }
     });
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [openPath]);
+  }, [openPath, insertMedia]);
 
   // 标题栏
   useEffect(() => {
@@ -696,6 +829,21 @@ export default function App() {
           title="显示/隐藏文件列表 (Ctrl+Shift+B)"
         >
           列表
+        </button>
+        <button
+          onClick={() => setTableOpen(true)}
+          disabled={!activeTab}
+          title="在光标处插入 Markdown 表格"
+        >
+          表格
+        </button>
+        <button
+          onClick={() => setPreviewOpen(true)}
+          disabled={!activeTab}
+          className={previewOpen ? "on" : ""}
+          title="Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览"
+        >
+          预览
         </button>
         <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置">
           设置
@@ -865,6 +1013,10 @@ export default function App() {
               onOpenAiSettings={() => setAiSettingsOpen(true)}
               readOnly={activeTab.readOnly}
               columnMode={columnMode}
+              annotations={annotations}
+              onAnnotate={handleAnnotate}
+              onAnnotationsReplace={persistAnnotations}
+              onDeleteAnnotation={handleDeleteAnnotation}
             />
             </>
           )
@@ -882,6 +1034,7 @@ export default function App() {
           eol={activeTab.eol}
           language={lang.name}
           path={activeTab.path}
+          zoom={editorSettings.zoom}
         />
       )}
         </div>
@@ -940,6 +1093,22 @@ export default function App() {
           value={editorSettings}
           onChange={setEditorSettings}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {/* 插入表格 */}
+      {tableOpen && (
+        <InsertTableDialog onInsert={insertText} onClose={() => setTableOpen(false)} />
+      )}
+
+      {/* Markdown 预览 */}
+      {previewOpen && activeTab && (
+        <PreviewDialog
+          title={activeTab.name}
+          source={activeTab.content}
+          fontSize={effectiveFontSize(editorSettings)}
+          onExportHtml={exportPreviewHtml}
+          onClose={() => setPreviewOpen(false)}
         />
       )}
 

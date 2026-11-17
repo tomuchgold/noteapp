@@ -1,24 +1,30 @@
 import { useEffect, useRef, useState } from "react";
-import { EditorState, Compartment, EditorSelection } from "@codemirror/state";
+import { EditorState, Compartment, EditorSelection, StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
   EditorView,
   keymap,
   lineNumbers,
   highlightActiveLine,
   highlightActiveLineGutter,
-  drawSelection,
   highlightSpecialChars,
   highlightWhitespace,
   crosshairCursor,
+  ViewPlugin,
+  Decoration,
+  type DecorationSet,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, cursorCharLeft, cursorCharRight, cursorLineUp, cursorLineDown, deleteCharBackward, deleteCharForward, insertNewlineAndIndent, insertTab } from "@codemirror/commands";
 import { bracketMatching, foldGutter, foldKeymap, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, autocompletion } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { oneDarkHighlightStyle } from "@codemirror/theme-one-dark";
 import { detectLanguage } from "../lib/lang";
 import { AI_ACTIONS, type AiAction } from "../lib/ai";
 import type { EditorSettings } from "../lib/settings";
+import { effectiveFontSize } from "../lib/settings";
+import { findTheme, type ThemeDef } from "../lib/themes";
+import { HIGHLIGHT_COLORS, reconcileAnnotations, type Annotation, type AnnotationKind } from "../lib/annotations";
 import type { MacroItem } from "../lib/types";
 
 /** 宏回放：按键 → CodeMirror 命令 */
@@ -38,7 +44,7 @@ interface Props {
   languagePath: string | null;
   onChange: (value: string) => void;
   onCursor: (line: number, col: number, selected: number) => void;
-  /** 外部请求触发（如 Ctrl+F、宏回放、AI 结果写回） */
+  /** 外部请求触发（Ctrl+F、宏回放、AI 写回、插入表格/文本） */
   actionSignal: { type: string; n: number; items?: MacroItem[]; text?: string } | null;
   /** 编辑器样式设置 */
   settings: EditorSettings;
@@ -54,6 +60,14 @@ interface Props {
   readOnly?: boolean;
   /** 列编辑模式（矩形选区 + 十字光标） */
   columnMode?: boolean;
+  /** 当前文件的标注列表（持久化由上层负责） */
+  annotations?: Annotation[];
+  /** 添加/更新标注（上层生成 id 并持久化） */
+  onAnnotate?: (a: { from: number; to: number; text: string; kind: AnnotationKind; color?: string; note?: string }) => void;
+  /** 整体替换标注列表（重载校准用） */
+  onAnnotationsReplace?: (list: Annotation[]) => void;
+  /** 删除标注 */
+  onDeleteAnnotation?: (id: string) => void;
 }
 
 const languageComp = new Compartment();
@@ -63,8 +77,10 @@ const tabComp = new Compartment();
 const wrapComp = new Compartment();
 const wsComp = new Compartment();
 const activeLineComp = new Compartment();
+const paraComp = new Compartment();
 const editableComp = new Compartment();
 const colComp = new Compartment();
+const annComp = new Compartment();
 
 /** 按起止坐标算出矩形选区（每行一个区间，多光标同步输入） */
 function buildColumnSelection(view: EditorView, ax: number, ay: number, bx: number, by: number) {
@@ -87,31 +103,94 @@ function buildColumnSelection(view: EditorView, ax: number, ay: number, bx: numb
   return EditorSelection.create(ranges);
 }
 
-/** 亮色主题（自带背景，避免透出深色外壳） */
-const lightTheme = EditorView.theme(
-  {
-    "&": { backgroundColor: "#ffffff", color: "#1f2328" },
-    ".cm-gutters": { backgroundColor: "#f6f8fa", color: "#6a737d", border: "none" },
-    ".cm-activeLine": { backgroundColor: "#f0f4fa" },
-    ".cm-content": { caretColor: "#1f2328" },
-  },
-  { dark: false }
-);
-
-/** 字号 / 行高样式（随设置实时变化） */
-function themeExtensions(s: EditorSettings) {
-  return s.theme === "dark"
-    ? [oneDark, syntaxHighlighting(defaultHighlightStyle, { fallback: true })]
-    : [lightTheme, syntaxHighlighting(defaultHighlightStyle, { fallback: true })];
+/** 主题 → CodeMirror 扩展（背景/前景/行号/当前行/光标 + 语法高亮） */
+function themeFromDef(t: ThemeDef): Extension {
+  const theme = EditorView.theme(
+    {
+      "&": { backgroundColor: t.colors.bg, color: t.colors.fg },
+      ".cm-gutters": { backgroundColor: t.colors.gutterBg, color: t.colors.gutterFg, border: "none" },
+      ".cm-activeLine": { backgroundColor: t.colors.activeLine },
+      ".cm-activeLineGutter": { backgroundColor: t.colors.activeLine },
+      ".cm-content": { caretColor: t.colors.caret },
+    },
+    { dark: t.dark }
+  );
+  const hl = t.dark ? oneDarkHighlightStyle : defaultHighlightStyle;
+  return [theme, syntaxHighlighting(hl, { fallback: true })];
 }
 
+/** 字号（含缩放）/ 行高样式（随设置实时变化） */
 function styleTheme(s: EditorSettings) {
   return EditorView.theme({
-    "&": { fontSize: `${s.fontSize}px` },
+    "&": { fontSize: `${effectiveFontSize(s)}px` },
     ".cm-scroller": { lineHeight: String(s.lineHeight) },
-    ".cm-gutters": { fontSize: `${Math.max(11, s.fontSize - 2)}px` },
+    ".cm-gutters": { fontSize: `${Math.max(11, Math.round(effectiveFontSize(s)) - 2)}px` },
   });
 }
+
+// ---------- 当前段落高亮 ----------
+/** 光标所在整段（空行分隔的连续非空行块）加亮色行装饰 */
+function paraDecorations(view: EditorView): DecorationSet {
+  const head = view.state.selection.main.head;
+  const line = view.state.doc.lineAt(head);
+  if (!line.text.trim()) return Decoration.none;
+  let from = line.number;
+  let to = line.number;
+  while (from > 1 && view.state.doc.line(from - 1).text.trim()) from--;
+  while (to < view.state.doc.lines && view.state.doc.line(to + 1).text.trim()) to++;
+  const ranges = [];
+  for (let n = from; n <= to; n++) {
+    const l = view.state.doc.line(n);
+    ranges.push(Decoration.line({ class: "cm-para-line" }).range(l.from));
+  }
+  return Decoration.set(ranges, true);
+}
+
+const paraHighlightPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = paraDecorations(view);
+    }
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.selectionSet) this.decorations = paraDecorations(u.view);
+    }
+  },
+  { decorations: (v) => v.decorations }
+);
+
+// ---------- 标注（划线/高亮/备注） ----------
+export const setAnnotationsEffect = StateEffect.define<Annotation[]>();
+
+function annotationDecorations(list: Annotation[], docLen: number): DecorationSet {
+  const ranges = [];
+  for (const a of list) {
+    const from = Math.max(0, Math.min(a.from, docLen));
+    const to = Math.max(from, Math.min(a.to, docLen));
+    if (from === to) continue;
+    const attrs: Record<string, string> = {};
+    if (a.note) attrs.title = a.note;
+    if (a.kind === "underline") {
+      ranges.push(Decoration.mark({ class: "cm-ann-underline", attributes: attrs }).range(from, to));
+    } else {
+      const style = a.kind === "highlight" && a.color ? `background-color:${a.color};color:#1f2328;` : "";
+      ranges.push(Decoration.mark({ class: "cm-ann-hl", attributes: { ...attrs, style } }).range(from, to));
+    }
+  }
+  return Decoration.set(ranges, true);
+}
+
+const annotationsField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, tr) {
+    let d = value.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(setAnnotationsEffect)) d = annotationDecorations(e.value, tr.state.doc.length);
+    }
+    return d;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
 
 export default function Editor({
   content,
@@ -126,6 +205,10 @@ export default function Editor({
   onOpenAiSettings,
   readOnly,
   columnMode,
+  annotations = [],
+  onAnnotate,
+  onAnnotationsReplace,
+  onDeleteAnnotation,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -133,15 +216,20 @@ export default function Editor({
   const onCursorRef = useRef(onCursor);
   const onZoomRef = useRef(onZoom);
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [noteInput, setNoteInput] = useState<{ text: string; from: number; to: number; x: number; y: number } | null>(null);
   const switchingRef = useRef(false);
 
   onChangeRef.current = onChange;
   onCursorRef.current = onCursor;
   onZoomRef.current = onZoom;
 
+  const theme = findTheme(settings.theme);
+
   // 初始化 EditorView（只挂载一次）
   useEffect(() => {
     if (!hostRef.current) return;
+    const s = settings;
+    const t = findTheme(s.theme);
     const view = new EditorView({
       parent: hostRef.current,
       state: EditorState.create({
@@ -154,14 +242,16 @@ export default function Editor({
           highlightSpecialChars(),
           history(),
           foldGutter(),
-          drawSelection(),
-          wrapComp.of(settings.wrap ? [EditorView.lineWrapping] : []),
-          wsComp.of(settings.showWhitespace ? [highlightWhitespace()] : []),
-          activeLineComp.of(settings.activeLine ? [highlightActiveLine()] : []),
-          styleComp.of(styleTheme(settings)),
-          editableComp.of(EditorView.editable.of(!readOnly)),
-          colComp.of(columnMode ? [crosshairCursor()] : []),
-          tabComp.of(EditorState.tabSize.of(settings.tabSize)),
+          // 不用 drawSelection：采用浏览器原生选区，CSS 可做「反色」选取样式
+          wrapComp.of(s.wrap ? [EditorView.lineWrapping] : []),
+          wsComp.of(s.showWhitespace ? [highlightWhitespace()] : []),
+          activeLineComp.of(s.activeLine ? [highlightActiveLine()] : []),
+          paraComp.of(s.paragraphHighlight ? [paraHighlightPlugin] : []),
+          annComp.of([annotationsField]),
+          styleComp.of(styleTheme(s)),
+          editableComp.of(EditorView.editable.of(true)),
+          colComp.of([]),
+          tabComp.of(EditorState.tabSize.of(s.tabSize)),
           indentOnInput(),
           bracketMatching(),
           closeBrackets(),
@@ -176,7 +266,7 @@ export default function Editor({
             indentWithTab,
           ]),
           languageComp.of([]),
-          themeComp.of(themeExtensions(settings)),
+          themeComp.of(themeFromDef(t)),
           EditorView.updateListener.of((u) => {
             if (switchingRef.current) return;
             if (u.docChanged) {
@@ -204,9 +294,21 @@ export default function Editor({
       view.destroy();
       viewRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 文档内容切换（激活标签变化时）
+  // 主题 CSS 变量（反色选区 / 段落高亮从变量取色）
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    host.style.setProperty("--np-bg", theme.colors.bg);
+    host.style.setProperty("--np-fg", theme.colors.fg);
+    host.style.setProperty("--np-para", theme.colors.para);
+    host.style.setProperty("--np-accent", theme.colors.accent);
+    host.dataset.dark = theme.dark ? "1" : "0";
+  }, [theme]);
+
+  // 文档内容切换（激活标签变化时）；同时校准标注位置
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -217,6 +319,12 @@ export default function Editor({
       switchingRef.current = false;
       view.focus();
     }
+    // 内容变化后重新校准标注
+    if (annotations.length > 0) {
+      const fixed = reconcileAnnotations(view.state.doc.toString(), annotations);
+      if (fixed.length !== annotations.length) onAnnotationsReplace?.(fixed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content]);
 
   // 语言切换
@@ -240,10 +348,18 @@ export default function Editor({
         wrapComp.reconfigure(settings.wrap ? [EditorView.lineWrapping] : []),
         wsComp.reconfigure(settings.showWhitespace ? [highlightWhitespace()] : []),
         activeLineComp.reconfigure(settings.activeLine ? [highlightActiveLine()] : []),
-        themeComp.reconfigure(themeExtensions(settings)),
+        paraComp.reconfigure(settings.paragraphHighlight ? [paraHighlightPlugin] : []),
+        themeComp.reconfigure(themeFromDef(findTheme(settings.theme))),
       ],
     });
   }, [settings]);
+
+  // 标注变化 → 应用装饰
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({ effects: setAnnotationsEffect.of(annotations) });
+  }, [annotations]);
 
   // 只读 / 列编辑模式变化
   useEffect(() => {
@@ -316,7 +432,7 @@ export default function Editor({
     };
   }, [columnMode]);
 
-  // 外部动作（Ctrl+F 打开搜索面板等）
+  // 外部动作（Ctrl+F、宏回放、AI 写回、插入表格/文本）
   useEffect(() => {
     if (!actionSignal) return;
     const view = viewRef.current;
@@ -325,6 +441,14 @@ export default function Editor({
     if (actionSignal.type === "find") {
       import("@codemirror/search").then(({ openSearchPanel }) => {
         if (viewRef.current) openSearchPanel(viewRef.current);
+      });
+    } else if (actionSignal.type === "insert-text" && actionSignal.text !== undefined) {
+      // 在光标处插入文本（插入表格 / markdown 片段等）
+      const sel = view.state.selection.main;
+      view.dispatch({
+        changes: { from: sel.head, insert: actionSignal.text },
+        selection: { anchor: sel.head + actionSignal.text.length },
+        scrollIntoView: true,
       });
     } else if (actionSignal.type === "macro-replay" && actionSignal.items) {
       // 宏回放：按录制顺序重放文本输入与按键命令
@@ -369,21 +493,56 @@ export default function Editor({
     }
   }, [actionSignal]);
 
-  // 右键：有选中内容时弹出 AI 动作菜单
+  /** 光标/选区命中的已有标注 */
+  function hitAnnotations(): Annotation[] {
+    const view = viewRef.current;
+    if (!view) return [];
+    const sel = view.state.selection.main;
+    return annotations.filter((a) => a.from < sel.to && sel.from < a.to && a.from >= 0);
+  }
+
+  // 右键：弹出 标注 + AI 动作 菜单
   function handleContextMenu(e: React.MouseEvent) {
     const view = viewRef.current;
     if (!view) return;
     const sel = view.state.selection.main;
-    if (sel.empty) return; // 无选区 → 保留浏览器默认菜单
-    const text = view.state.sliceDoc(sel.from, sel.to);
-    if (!text.trim()) return;
+    const hits = hitAnnotations();
+    if (sel.empty && hits.length === 0) return; // 无选区且未命中标注 → 保留默认菜单
+    const text = sel.empty ? "" : view.state.sliceDoc(sel.from, sel.to);
+    if (!sel.empty && !text.trim()) return;
     e.preventDefault();
     setAiMenu({
-      x: Math.min(e.clientX, window.innerWidth - 220),
-      y: Math.min(e.clientY, window.innerHeight - 300),
+      x: Math.min(e.clientX, window.innerWidth - 230),
+      y: Math.min(e.clientY, window.innerHeight - 360),
       text,
     });
   }
+
+  /** 选区信息（标注写入用） */
+  function currentSelection(): { from: number; to: number; text: string } | null {
+    const view = viewRef.current;
+    if (!view) return null;
+    const sel = view.state.selection.main;
+    if (sel.empty) return null;
+    return { from: sel.from, to: sel.to, text: view.state.sliceDoc(sel.from, sel.to) };
+  }
+
+  function annotate(kind: AnnotationKind, color?: string) {
+    const sel = currentSelection();
+    setAiMenu(null);
+    if (!sel) return;
+    onAnnotate?.({ ...sel, kind, color });
+  }
+
+  function openNoteInput() {
+    const sel = currentSelection();
+    const pos = aiMenu ? { x: aiMenu.x, y: aiMenu.y } : { x: 200, y: 200 };
+    setAiMenu(null);
+    if (!sel) return;
+    setNoteInput({ text: "", from: sel.from, to: sel.to, ...pos });
+  }
+
+  const menuHits = aiMenu ? hitAnnotations() : [];
 
   return (
     <div
@@ -392,8 +551,9 @@ export default function Editor({
       ref={hostRef}
       onContextMenu={handleContextMenu}
       onMouseDown={(e) => {
-        if ((e.target as HTMLElement).closest(".ai-menu")) return;
+        if ((e.target as HTMLElement).closest(".ai-menu, .note-input-pop")) return;
         setAiMenu(null);
+        setNoteInput(null);
       }}
     >
       {aiMenu && (
@@ -402,34 +562,118 @@ export default function Editor({
           style={{ left: aiMenu.x, top: aiMenu.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="ai-menu-head">
-            AI 操作
-            <span className="ai-menu-sub">{aiMenu.text.length} 字符</span>
-          </div>
-          {!aiReady && (
-            <button
-              className="ai-menu-config"
-              onClick={() => {
-                setAiMenu(null);
-                onOpenAiSettings?.();
-              }}
-            >
-              尚未配置模型，点此设置 →
-            </button>
+          {aiMenu.text && (
+            <>
+              <div className="ai-menu-head">
+                标注
+                <span className="ai-menu-sub">{aiMenu.text.length} 字符</span>
+              </div>
+              <div className="ann-colors">
+                {HIGHLIGHT_COLORS.map((c) => (
+                  <button
+                    key={c.key}
+                    className="ann-color"
+                    style={{ backgroundColor: c.value }}
+                    title={`高亮标注（${c.name}）`}
+                    onClick={() => annotate("highlight", c.value)}
+                  />
+                ))}
+                <button className="ann-menu-item" title="给选中文字加下划线" onClick={() => annotate("underline")}>
+                  划线
+                </button>
+                <button className="ann-menu-item" title="添加标注信息（备注，悬停可查看）" onClick={openNoteInput}>
+                  标注信息
+                </button>
+              </div>
+            </>
           )}
-          {AI_ACTIONS.map((a) => (
+          {menuHits.length > 0 && (
+            <>
+              <div className="ai-menu-head">已有标注</div>
+              {menuHits.map((a) => (
+                <button
+                  key={a.id}
+                  className="ann-menu-item ann-remove"
+                  title={a.note ? `备注：${a.note}` : a.kind === "underline" ? "下划线标注" : "高亮标注"}
+                  onClick={() => {
+                    setAiMenu(null);
+                    onDeleteAnnotation?.(a.id);
+                  }}
+                >
+                  删除标注 {a.note ? `· ${a.note.slice(0, 10)}` : ""}
+                </button>
+              ))}
+            </>
+          )}
+          {aiMenu.text && (
+            <>
+              <div className="ai-menu-head">
+                AI 操作
+                <span className="ai-menu-sub">{aiMenu.text.length} 字符</span>
+              </div>
+              {!aiReady && (
+                <button
+                  className="ai-menu-config"
+                  onClick={() => {
+                    setAiMenu(null);
+                    onOpenAiSettings?.();
+                  }}
+                >
+                  尚未配置模型，点此设置 →
+                </button>
+              )}
+              {AI_ACTIONS.map((a) => (
+                <button
+                  key={a.id}
+                  disabled={!aiReady}
+                  title={a.hint}
+                  onClick={() => {
+                    setAiMenu(null);
+                    onAiAction?.(a.id, aiMenu.text);
+                  }}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {noteInput && (
+        <div
+          className="note-input-pop"
+          style={{ left: noteInput.x, top: Math.min(noteInput.y, window.innerHeight - 220) }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="ai-menu-head">标注信息</div>
+          <textarea
+            autoFocus
+            value={noteInput.text}
+            placeholder="写下备注，悬停标注文字时显示"
+            onChange={(e) => setNoteInput({ ...noteInput, text: e.target.value })}
+          />
+          <div className="note-input-actions">
             <button
-              key={a.id}
-              disabled={!aiReady}
-              title={a.hint}
+              className="primary"
               onClick={() => {
-                setAiMenu(null);
-                onAiAction?.(a.id, aiMenu.text);
+                const view = viewRef.current;
+                if (view && noteInput.text.trim()) {
+                  onAnnotate?.({
+                    from: noteInput.from,
+                    to: noteInput.to,
+                    text: view.state.sliceDoc(noteInput.from, noteInput.to),
+                    kind: "note",
+                    note: noteInput.text.trim(),
+                  });
+                }
+                setNoteInput(null);
               }}
             >
-              {a.label}
+              保存
             </button>
-          ))}
+            <button onClick={() => setNoteInput(null)}>取消</button>
+          </div>
         </div>
       )}
     </div>

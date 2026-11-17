@@ -1290,3 +1290,216 @@ button.link {
   font-size: 11px;
   opacity: 0.9;
 }
+
+/* ================= v0.9 ================= */
+
+/* 反色选区：选中文字背景/文字互换，段内也清晰可辨 */
+.editor-host .cm-content ::selection,
+.editor-host .cm-content::selection,
+.editor-host .cm-line::selection {
+  background-color: var(--np-fg, #abb2bf);
+  color: var(--np-bg, #282c34);
+}
+
+/* 当前段落高亮（亮色，盖过当前行高亮） */
+.editor-host .cm-line.cm-para-line {
+  background-color: var(--np-para, #333846) !important;
+}
+
+/* 标注：高亮（颜色由内联样式给出）/ 划线 */
+.editor-host .cm-ann-hl {
+  border-radius: 2px;
+}
+.editor-host .cm-ann-underline {
+  text-decoration: underline;
+  text-decoration-color: #e8590c;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* 右键菜单：标注区 */
+.ai-menu .ann-colors {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  flex-wrap: wrap;
+}
+.ai-menu .ann-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  padding: 0;
+}
+.ai-menu .ann-color:hover {
+  transform: scale(1.15);
+}
+.ai-menu .ann-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ai-menu .ann-menu-item:hover {
+  background: rgba(128, 128, 128, 0.18);
+}
+.ai-menu .ann-remove {
+  color: #e5534b;
+}
+
+/* 标注信息输入浮层 */
+.note-input-pop {
+  position: fixed;
+  z-index: 1000;
+  width: 300px;
+  background: var(--bg-panel, #21252b);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.note-input-pop textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  background: var(--bg, #1b1d22);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.note-input-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* 设置面板：主题色卡 */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.theme-swatch {
+  position: relative;
+  padding: 12px 8px 8px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  overflow: hidden;
+}
+.theme-swatch.on {
+  border-color: var(--accent, #4f8cff);
+  box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.35);
+}
+.theme-swatch .theme-swatch-a,
+.theme-swatch .theme-swatch-p {
+  position: absolute;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+.theme-swatch .theme-swatch-a { right: 8px; }
+.theme-swatch .theme-swatch-p { right: 26px; }
+.theme-ops {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+}
+.theme-ops button {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--fg);
+  cursor: pointer;
+}
+.theme-msg {
+  margin-top: 6px;
+  font-size: 12px;
+  width: 100%;
+}
+
+/* Markdown 预览 */
+.modal.preview {
+  width: 860px;
+  max-width: calc(100vw - 48px);
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.preview-head h3 {
+  margin: 0 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.markdown-body {
+  flex: 1;
+  overflow: auto;
+  line-height: 1.8;
+  background: #ffffff;
+  color: #24292f;
+  border-radius: 8px;
+  padding: 24px 28px;
+  font-size: 15px;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 { line-height: 1.4; margin: 1.2em 0 0.5em; }
+.markdown-body code { background: #f3f4f6; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.92em; }
+.markdown-body pre { background: #f6f8fa; padding: 14px 16px; border-radius: 8px; overflow: auto; }
+.markdown-body pre code { background: none; padding: 0; }
+.markdown-body table { border-collapse: collapse; margin: 1em 0; }
+.markdown-body th, .markdown-body td { border: 1px solid #d0d7de; padding: 6px 14px; }
+.markdown-body th { background: #f6f8fa; }
+.markdown-body blockquote { border-left: 4px solid #d0d7de; margin: 1em 0; padding: 0.1em 1em; color: #57606a; }
+.markdown-body img, .markdown-body audio, .markdown-body video { max-width: 100%; }
+.markdown-body img { border-radius: 6px; }
+.markdown-body hr { border: none; border-top: 1px solid #d0d7de; margin: 2em 0; }
+
+/* 插入表格 */
+.table-rows-cols {
+  display: flex;
+  gap: 16px;
+  margin: 10px 0;
+}
+.table-rows-cols label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.table-rows-cols input {
+  width: 70px;
+  background: var(--bg, #1b1d22);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
