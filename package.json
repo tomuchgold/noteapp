@@ -1,7 +1,7 @@
 {
   "name": "notepp",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "icons": "tauri icon src-tauri/icons/app-icon.png"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
     "@codemirror/commands": "^6.8.0",
     "@codemirror/lang-cpp": "^6.0.2",
     "@codemirror/lang-css": "^6.3.1",
