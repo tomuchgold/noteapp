@@ -87,3 +87,28 @@ export function readFileChunk(path: string, offset: number, length: number): Pro
 export function copyMediaFile(src: string, docPath: string): Promise<string> {
   return invoke("copy_media_file", { src, docPath });
 }
+
+/** 跨文件夹查找的单条命中（Rust search_in_folder 返回） */
+export interface FolderSearchHit {
+  path: string;
+  line: number;
+  text: string;
+  col: number;
+}
+
+/** 在文件夹中查找（Rust 递归遍历 + 后缀白名单） */
+export function searchInFolder(
+  root: string,
+  query: string,
+  opt: { caseSensitive: boolean; wholeWord: boolean; regex: boolean }
+): Promise<FolderSearchHit[]> {
+  return invoke("search_in_folder", {
+    req: {
+      root,
+      query,
+      case_sensitive: opt.caseSensitive,
+      whole_word: opt.wholeWord,
+      regex: opt.regex,
+    },
+  });
+}

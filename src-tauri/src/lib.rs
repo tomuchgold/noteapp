@@ -3,6 +3,8 @@
 mod ai;
 mod commands;
 
+/// 移动端（Android/iOS）入口：Tauri 2 的 Android 构建要求此标记
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -15,6 +17,7 @@ pub fn run() {
             commands::file_info,
             commands::read_file_chunk,
             commands::copy_media_file,
+            commands::search_in_folder,
             ai::ai_chat,
             ai::ai_models,
             ai::ai_chat_stream,

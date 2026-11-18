@@ -246,6 +246,196 @@ pub fn copy_media_file(src: String, doc_path: String) -> Result<String, String> 
     Ok(format!("media/{}", dest.file_name().unwrap().to_string_lossy()))
 }
 
+/// 跨文件夹查找的命中行
+#[derive(serde::Serialize)]
+pub struct SearchHit {
+    pub path: String,
+    /// 1 基行号
+    pub line: usize,
+    /// 该行文本（超长截断）
+    pub text: String,
+    /// 行内首个命中列（1 基，字符数）
+    pub col: usize,
+}
+
+/// 跨文件夹查找参数
+#[derive(serde::Deserialize)]
+pub struct SearchRequest {
+    pub root: String,
+    pub query: String,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub regex: bool,
+}
+
+/// 跳过的目录（构建产物 / 依赖 / 版本库）
+const SKIP_DIRS: [&str; 8] = [
+    "node_modules", ".git", "target", "dist", "build", ".next", "__pycache__", ".venv",
+];
+
+/// 允许搜索的文本后缀（白名单，避免读二进制）
+const TEXT_EXTS: [&str; 44] = [
+    "txt", "md", "markdown", "log", "js", "mjs", "cjs", "jsx", "ts", "tsx", "html", "htm",
+    "css", "scss", "less", "json", "jsonc", "py", "rs", "c", "h", "cpp", "cc", "cxx", "hpp",
+    "java", "go", "sql", "xml", "svg", "yml", "yaml", "sh", "bash", "zsh", "lua", "pas", "f90",
+    "f", "pl", "rb", "vue", "ini", "toml",
+];
+
+fn is_text_ext(path: &Path) -> bool {
+    match path.extension() {
+        Some(e) => TEXT_EXTS.contains(&e.to_string_lossy().to_lowercase().as_str()),
+        None => false,
+    }
+}
+
+/// 在文件夹中查找：递归遍历 + 后缀白名单 + 逐行匹配
+#[tauri::command]
+pub fn search_in_folder(req: SearchRequest) -> Result<Vec<SearchHit>, String> {
+    use std::collections::VecDeque;
+
+    if req.query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let root = std::path::PathBuf::from(&req.root);
+    if !root.is_dir() {
+        return Err(format!("不是有效目录：{}", req.root));
+    }
+
+    // 正则或普通文本匹配器
+    let re = if req.regex {
+        let pattern = if req.whole_word {
+            format!(r"\b(?:{})\b", req.query)
+        } else {
+            req.query.clone()
+        };
+        let builder = regex::RegexBuilder::new(&pattern)
+            .case_insensitive(!req.case_sensitive)
+            .size_limit(4 * 1024 * 1024)
+            .build()
+            .map_err(|e| format!("正则无效：{}", e))?;
+        Some(builder)
+    } else {
+        None
+    };
+    let needle = req.query.to_lowercase();
+
+    let mut hits: Vec<SearchHit> = Vec::new();
+    const MAX_HITS: usize = 2000;
+    let mut queue: VecDeque<std::path::PathBuf> = VecDeque::new();
+    queue.push_back(root);
+
+    while let Some(dir) = queue.pop_front() {
+        let rd = match fs::read_dir(&dir) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        for item in rd.flatten() {
+            if hits.len() >= MAX_HITS {
+                return Ok(hits);
+            }
+            let p = item.path();
+            let name = item.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+            let ft = match item.file_type() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            if ft.is_dir() {
+                if !SKIP_DIRS.contains(&name.as_str()) {
+                    queue.push_back(p);
+                }
+                continue;
+            }
+            if !is_text_ext(&p) {
+                continue;
+            }
+            // 单文件上限 4MB，避免卡死
+            let meta = match item.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.len() > 4 * 1024 * 1024 {
+                continue;
+            }
+            let bytes = match fs::read(&p) {
+                Ok(b) => b,
+                Err(_) => continue,
+            };
+            let content = match String::from_utf8(bytes) {
+                Ok(c) => c,
+                Err(_) => continue, // 非 UTF-8 跳过（跨平台查找以 UTF-8 为准）
+            };
+            let display = p.to_string_lossy().to_string();
+            for (idx, line) in content.lines().enumerate() {
+                if line.len() > 4000 {
+                    continue;
+                }
+                let matched = match &re {
+                    Some(r) => r.is_match(line),
+                    None => {
+                        if req.case_sensitive {
+                            if req.whole_word {
+                                find_whole_word(line, &req.query).is_some()
+                            } else {
+                                line.contains(&req.query)
+                            }
+                        } else if req.whole_word {
+                            find_whole_word(&line.to_lowercase(), &needle).is_some()
+                        } else {
+                            line.to_lowercase().contains(&needle)
+                        }
+                    }
+                };
+                if !matched {
+                    continue;
+                }
+                let col = match &re {
+                    Some(r) => r.find(line).map(|m| line[..m.start()].chars().count() + 1).unwrap_or(1),
+                    None => {
+                        let hay = if req.case_sensitive { line.to_string() } else { line.to_lowercase() };
+                        let q = if req.case_sensitive { req.query.clone() } else { needle.clone() };
+                        hay.find(&q).map(|i| hay[..i].chars().count() + 1).unwrap_or(1)
+                    }
+                };
+                let mut text = line.trim_end().to_string();
+                if text.chars().count() > 200 {
+                    text = text.chars().take(200).collect::<String>() + "…";
+                }
+                hits.push(SearchHit { path: display.clone(), line: idx + 1, text, col });
+                if hits.len() >= MAX_HITS {
+                    return Ok(hits);
+                }
+            }
+        }
+    }
+    Ok(hits)
+}
+
+/// 全字匹配（ASCII 边界判定，中文按非单词字符处理）
+fn find_whole_word(hay: &str, needle: &str) -> Option<usize> {
+    if needle.is_empty() {
+        return None;
+    }
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    let mut start = 0;
+    while let Some(i) = hay[start..].find(needle) {
+        let abs = start + i;
+        let before_ok = abs == 0 || !hay[..abs].chars().next_back().map(is_word).unwrap_or(false);
+        let end = abs + needle.len();
+        let after_ok = end >= hay.len() || !hay[end..].chars().next().map(is_word).unwrap_or(false);
+        if before_ok && after_ok {
+            return Some(abs);
+        }
+        start = abs + needle.len().max(1);
+        if start >= hay.len() {
+            break;
+        }
+    }
+    None
+}
+
 /// 分块读取：从 offset 起读 length 字节，按 UTF-8 容错解码。
 /// 用于大文件模式（>8MB），避免一次性把整个文件读进内存。
 #[tauri::command]

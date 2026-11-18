@@ -1,0 +1,122 @@
+name: Build Android APK
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: >-
+            platforms;android-34
+            build-tools;34.0.0
+            platform-tools
+            ndk;26.1.10909125
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: 缓存 Rust（Android 目标）
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          key: android
+
+      - name: 安装前端依赖
+        run: pnpm install
+
+      - name: 构建前端
+        run: pnpm build
+
+      - name: 选择 NDK 并导出环境变量
+        run: |
+          NDK_DIR="$ANDROID_HOME/ndk/26.1.10909125"
+          if [ ! -d "$NDK_DIR" ]; then
+            NDK_DIR=$(ls -d "$ANDROID_HOME"/ndk/* | head -1)
+          fi
+          echo "NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
+          echo "使用 NDK: $NDK_DIR"
+          # 16KB 内存页对齐（Android 15+ 设备要求，否则原生库加载失败）
+          echo "RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384" >> $GITHUB_ENV
+
+      - name: 生成 Android 工程
+        run: pnpm tauri android init --ci
+
+      - name: 注入签名配置
+        run: |
+          KSTORE="$GITHUB_WORKSPACE/src-tauri/notepp-release.keystore"
+          cp "$KSTORE" "$GITHUB_WORKSPACE/src-tauri/gen/android/app/notepp-release.keystore"
+          cat > /tmp/signing.gradle <<EOF
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("notepp-release.keystore")
+                      storePassword "notepp123"
+                      keyAlias "notepp"
+                      keyPassword "notepp123"
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
+          # 追加到 app 模块的 gradle 配置末尾
+          cat /tmp/signing.gradle >> "$GITHUB_WORKSPACE/src-tauri/gen/android/app/build.gradle.kts"
+          echo "签名配置已注入"
+
+      - name: 构建 APK
+        run: pnpm tauri android build --apk
+        env:
+          CI: "true"
+
+      - name: 收集产物
+        run: |
+          mkdir -p out
+          find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -exec cp {} out/ \;
+          ls -lh out
+
+      - name: 上传构建产物（兜底）
+        uses: actions/upload-artifact@v4
+        with:
+          name: NotePP-android-${{ github.ref_name }}
+          path: out/*.apk
+          if-no-files-found: error
+
+      - name: 附加到 Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          fail_on_unmatched_files: false

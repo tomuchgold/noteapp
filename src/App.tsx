@@ -12,6 +12,15 @@ import SettingsDialog from "./components/SettingsDialog";
 import Splitter from "./components/Splitter";
 import InsertTableDialog from "./components/InsertTableDialog";
 import PreviewDialog from "./components/PreviewDialog";
+import FindBar from "./components/FindBar";
+import {
+  applyCase,
+  DEFAULT_OPTIONS,
+  findAll,
+  replaceAll,
+  type FolderHitGroup,
+  type SearchOptions,
+} from "./lib/search";
 import AiSettingsDialog from "./components/AiSettingsDialog";
 import AiResultDialog from "./components/AiResultDialog";
 import AiCustomDialog from "./components/AiCustomDialog";
@@ -38,6 +47,7 @@ import {
   getRecent,
   openDirectoryDialog,
   copyMediaFile,
+  searchInFolder,
 } from "./lib/files";
 import {
   clampFilelistWidth,
@@ -96,6 +106,11 @@ function fmtMB(bytes: number) {
 const LARGE_FILE_LIMIT = 8 * 1024 * 1024;
 /** 每次加载的字节数 */
 const LARGE_FILE_CHUNK = 1024 * 1024;
+
+/** 窄屏（手机/小窗）判定：移动端抽屉行为用 */
+function isNarrow(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 820px)").matches;
+}
 
 export default function App() {
   const [tabs, setTabs] = useState<FileTab[]>([]);
@@ -262,6 +277,172 @@ export default function App() {
     setTabs((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
 
+  // ---------- 查找替换（当前文件 + 跨文件夹） ----------
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [findOptions, setFindOptions] = useState<SearchOptions>(DEFAULT_OPTIONS);
+  const [findSeed, setFindSeed] = useState("");
+  const [findCurrent, setFindCurrent] = useState(0);
+  const [gotoRequest, setGotoRequest] = useState<{ n: number; from: number; to: number } | null>(null);
+  const [folderHits, setFolderHits] = useState<FolderHitGroup[]>([]);
+  const [folderLoading, setFolderLoading] = useState(false);
+  const [folderMessage, setFolderMessage] = useState<string | null>(null);
+  /** 替换结果轻提示（如「已替换 12 处」） */
+  const [replaceMsg, setReplaceMsg] = useState<string | null>(null);
+  const gotoSeq = useRef(0);
+
+  /** 当前文件的全部匹配（面板计数与跳转共用） */
+  const findMatches = useMemo(
+    () => (activeTab ? findAll(activeTab.content, findQuery, findOptions) : []),
+    [activeTab?.content, findQuery, findOptions]
+  );
+
+  /** 搜索高亮（当前命中单独标色） */
+  const searchMarks = useMemo(
+    () => findMatches.map((m, i) => ({ ...m, current: i === findCurrent })),
+    [findMatches, findCurrent]
+  );
+
+  /** 当前查找位置的位置指针；null 表示还没跳过（下次跳第一处） */
+  const findPosRef = useRef<number | null>(null);
+  /** 当前序号（与 findCurrent 同步，供 stepFind 读取最新值） */
+  const findCurrentRef = useRef(-1);
+
+  const gotoMatch = useCallback(
+    (idx: number) => {
+      const m = findMatches[idx];
+      if (!m) return;
+      findCurrentRef.current = idx;
+      setFindCurrent(idx);
+      findPosRef.current = m.from;
+      gotoSeq.current += 1;
+      setGotoRequest({ n: gotoSeq.current, from: m.from, to: m.to });
+    },
+    [findMatches]
+  );
+
+  // 查询/选项真正变化时才重置指针与序号（不能在每次重渲染里重置，否则跳转会被打回第一处）
+  const findKeyRef = useRef("");
+  useEffect(() => {
+    if (!findOpen) return;
+    const key = `${findQuery}\u0000${findOptions.caseSensitive}${findOptions.wholeWord}${findOptions.regex}`;
+    if (findKeyRef.current === key) return;
+    findKeyRef.current = key;
+    findPosRef.current = null;
+    findCurrentRef.current = -1;
+    setFindCurrent(0);
+    // 输入即预览：把光标移到第一处命中，并把「当前位置」记到第一处，
+    // 这样下一次「下一处」是第 2 处，而不是原地不动。
+    const first = findMatches[0];
+    if (first) {
+      findCurrentRef.current = 0;
+      findPosRef.current = first.from;
+      gotoSeq.current += 1;
+      setGotoRequest({ n: gotoSeq.current, from: first.from, to: first.to });
+    } else {
+      setGotoRequest(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findQuery, findOptions, findMatches, findOpen]);
+
+  const stepFind = useCallback(
+    (dir: 1 | -1) => {
+      if (findMatches.length === 0) return;
+      const cur = findCurrentRef.current;
+      // 还没跳过（-1）→ 正向从第一处开始；反向从最后一处开始
+      const target =
+        cur < 0 || cur >= findMatches.length
+          ? dir === 1
+            ? 0
+            : findMatches.length - 1
+          : (cur + dir + findMatches.length) % findMatches.length;
+      gotoMatch(target);
+    },
+    [findMatches, gotoMatch]
+  );
+
+  /** 替换当前命中 */
+  const doReplace = useCallback(
+    (replacement: string) => {
+      if (!activeTab || findMatches.length === 0) return;
+      const idx = findCurrent >= 0 && findCurrent < findMatches.length ? findCurrent : 0;
+      const m = findMatches[idx];
+      const piece = applyCase(activeTab.content.slice(m.from, m.to), replacement, findOptions);
+      const next = activeTab.content.slice(0, m.from) + piece + activeTab.content.slice(m.to);
+      updateTab(activeTab.id, { content: next, dirty: true });
+      // 替换后光标停在替换文本末尾，再跳到下一处
+      gotoSeq.current += 1;
+      setGotoRequest({ n: gotoSeq.current, from: m.from + piece.length, to: m.from + piece.length });
+      findCurrentRef.current = idx;
+      setFindCurrent(idx);
+    },
+    [activeTab, findMatches, findCurrent, findOptions, updateTab]
+  );
+
+  /** 全部替换（可撤销：替换前后各入一次历史，CodeMirror 的 undo 会合并为一步） */
+  const doReplaceAll = useCallback(
+    (replacement: string) => {
+      if (!activeTab || findMatches.length === 0) return;
+      const { text, count } = replaceAll(activeTab.content, findQuery, replacement, findOptions);
+      updateTab(activeTab.id, { content: text, dirty: true });
+      setFindCurrent(0);
+      findCurrentRef.current = -1;
+      findPosRef.current = null;
+      setReplaceMsg(`已替换 ${count} 处`);
+      window.setTimeout(() => setReplaceMsg(null), 4000);
+    },
+    [activeTab, findMatches.length, findQuery, findOptions, updateTab]
+  );
+
+  /** 在文件夹中查找 */
+  const doFolderSearch = useCallback(
+    async (q: string, opt: SearchOptions) => {
+      if (!folderRoot || !q) return;
+      setFolderLoading(true);
+      setFolderMessage(null);
+      try {
+        const hits = await searchInFolder(folderRoot, q, opt);
+        const map = new Map<string, FolderHitGroup>();
+        for (const h of hits) {
+          const g = map.get(h.path) ?? { path: h.path, name: baseName(h.path), hits: [] };
+          g.hits.push(h);
+          map.set(h.path, g);
+        }
+        setFolderHits([...map.values()]);
+        setFolderMessage(hits.length === 0 ? "没有匹配结果" : null);
+      } catch (e) {
+        setFolderHits([]);
+        setFolderMessage(String(e instanceof Error ? e.message : e));
+      } finally {
+        setFolderLoading(false);
+      }
+    },
+    [folderRoot]
+  );
+
+  /** 打开文件夹搜索结果：打开文件并跳到对应行 */
+  const openFolderHit = useCallback(
+    async (path: string, line: number) => {
+      await openPathRef.current(path);
+      // 等标签挂载后跳到该行
+      window.setTimeout(() => {
+        setActionSignal({ type: "goto-line", n: ++actionCount.current, text: String(line) });
+      }, 250);
+    },
+    []
+  );
+
+  /** openPath 的引用（避免循环依赖，供 openFolderHit 使用） */
+  const openPathRef = useRef<(p: string) => Promise<void>>(async () => {});
+
+  /** 打开查找栏（带入选中文本） */
+  const openFind = useCallback(() => {
+    const sel = window.getSelection()?.toString() ?? "";
+    setFindSeed(sel.length > 0 && sel.length < 300 ? sel : "");
+    setFindOpen(true);
+  }, []);
+
+
   // ---------- 标注（划线/高亮/备注，按文件路径持久化） ----------
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const activePath = activeTab?.path ?? null;
@@ -419,6 +600,11 @@ export default function App() {
       alert(`打开文件失败：${e}`);
     }
   }, [tabs]);
+
+  // openPath 就绪后写入 ref，供文件夹搜索结果跳转使用
+  useEffect(() => {
+    openPathRef.current = openPath;
+  }, [openPath]);
 
   /** 大文件模式：追加下一块 */
   const loadMoreChunk = useCallback(async () => {
@@ -703,8 +889,16 @@ export default function App() {
         setLayout((l) => ({ ...l, sidebarOpen: !l.sidebarOpen }));
       } else if (key === "f") {
         e.preventDefault();
-        actionCount.current += 1;
-        setActionSignal({ type: "find", n: actionCount.current });
+        openFind();
+      } else if (key === "h") {
+        // Ctrl+H：打开查找并聚焦替换框（与查找栏共用）
+        e.preventDefault();
+        openFind();
+      } else if (key === "f3") {
+        e.preventDefault();
+        stepFind(e.shiftKey ? -1 : 1);
+      } else if (key === "escape") {
+        setFindOpen(false);
       } else if (key === "r" && e.shiftKey) {
         e.preventDefault();
         toggleRecord();
@@ -725,7 +919,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [newTab, openDialog, saveTab, closeTab, activeTab, activeId, tabs, toggleRecord, replayMacro]);
+  }, [newTab, openDialog, saveTab, closeTab, activeTab, activeId, tabs, toggleRecord, replayMacro, openFind, stepFind]);
 
   // 状态栏点击：循环切换保存编码
   useEffect(() => {
@@ -801,6 +995,9 @@ export default function App() {
         <button onClick={() => activeTab && saveTab(activeTab)}>保存</button>
         <button onClick={() => activeTab && saveTab(activeTab, true)}>另存为</button>
         <button onClick={() => setDiffDialog(true)}>对比</button>
+        <button onClick={() => openFind()} title="查找替换 (Ctrl+F，Shift+F3 反向)">
+          查找
+        </button>
         <button onClick={() => activeId && closeTab(activeId)}>关闭</button>
         <button
           onClick={toggleRecord}
@@ -899,6 +1096,13 @@ export default function App() {
           } as React.CSSProperties
         }
       >
+        {/* 窄屏抽屉遮罩：点击关闭侧栏/文件列表 */}
+        {(layout.sidebarOpen || layout.filelistOpen) && (
+          <div
+            className="drawer-mask"
+            onClick={() => patchLayout({ sidebarOpen: false, filelistOpen: false })}
+          />
+        )}
         {layout.sidebarOpen && (
           <Sidebar
             categories={categories}
@@ -937,7 +1141,11 @@ export default function App() {
             query={query}
             categories={categories}
             onQuery={setQuery}
-            onOpen={openPath}
+            onOpen={(p) => {
+              void openPath(p);
+              // 手机上打开文件后自动收起抽屉，避免遮住编辑区
+              if (isNarrow()) patchLayout({ filelistOpen: false, sidebarOpen: false });
+            }}
             onToggleFav={toggleFav}
             onAssign={assignCategory}
             onRemove={removeFromLibrary}
@@ -1017,11 +1225,37 @@ export default function App() {
               onAnnotate={handleAnnotate}
               onAnnotationsReplace={persistAnnotations}
               onDeleteAnnotation={handleDeleteAnnotation}
+              searchMarks={searchMarks}
+              gotoRequest={gotoRequest}
             />
             </>
           )
         )}
       </div>
+
+      {activeTab && (
+        <FindBar
+          open={findOpen}
+          total={findMatches.length}
+          current={findMatches.length === 0 ? 0 : findCurrent + 1}
+          options={findOptions}
+          query={findQuery}
+          folderRoot={folderRoot}
+          folderHits={folderHits}
+          folderLoading={folderLoading}
+          folderMessage={folderMessage}
+          onQuery={setFindQuery}
+          onOptions={setFindOptions}
+          onStep={stepFind}
+          onReplace={doReplace}
+          onReplaceAll={doReplaceAll}
+          onFolderSearch={(q, o) => void doFolderSearch(q, o)}
+          onOpenHit={(p, l) => void openFolderHit(p, l)}
+          onClose={() => setFindOpen(false)}
+          seed={findSeed}
+          replaceMessage={replaceMsg}
+        />
+      )}
 
       {activeTab && (
         <StatusBar

@@ -68,6 +68,10 @@ interface Props {
   onAnnotationsReplace?: (list: Annotation[]) => void;
   /** 删除标注 */
   onDeleteAnnotation?: (id: string) => void;
+  /** 查找高亮（全部命中 + 当前命中） */
+  searchMarks?: { from: number; to: number; current: boolean }[];
+  /** 跳转请求（改变序号时生效）：跳到指定位置 */
+  gotoRequest?: { n: number; from: number; to: number } | null;
 }
 
 const languageComp = new Compartment();
@@ -81,6 +85,38 @@ const paraComp = new Compartment();
 const editableComp = new Compartment();
 const colComp = new Compartment();
 const annComp = new Compartment();
+const searchComp = new Compartment();
+
+/** 查找高亮：全部命中 + 当前命中（当前命中用独立类，允许叠加） */
+export const setSearchMarksEffect = StateEffect.define<{ from: number; to: number; current: boolean }[]>();
+
+function searchDecorations(list: { from: number; to: number; current: boolean }[], docLen: number): DecorationSet {
+  const ranges = [];
+  for (const m of list) {
+    const from = Math.max(0, Math.min(m.from, docLen));
+    const to = Math.max(from, Math.min(m.to, docLen));
+    if (from >= to) continue;
+    ranges.push(
+      Decoration.mark({ class: m.current ? "cm-search-hit cm-search-hit-current" : "cm-search-hit" }).range(from, to)
+    );
+  }
+  return Decoration.set(ranges, true);
+}
+
+const searchMarksField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, tr) {
+    const mapped = value.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(setSearchMarksEffect)) {
+        return searchDecorations(e.value, tr.state.doc.length);
+      }
+    }
+    // 文档变化后旧的高亮会错位，直接清掉更安全（面板会重新计算）
+    return tr.docChanged ? Decoration.none : mapped;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
 
 /** 按起止坐标算出矩形选区（每行一个区间，多光标同步输入） */
 function buildColumnSelection(view: EditorView, ax: number, ay: number, bx: number, by: number) {
@@ -209,6 +245,8 @@ export default function Editor({
   onAnnotate,
   onAnnotationsReplace,
   onDeleteAnnotation,
+  searchMarks = [],
+  gotoRequest,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -248,6 +286,7 @@ export default function Editor({
           activeLineComp.of(s.activeLine ? [highlightActiveLine()] : []),
           paraComp.of(s.paragraphHighlight ? [paraHighlightPlugin] : []),
           annComp.of([annotationsField]),
+          searchComp.of([searchMarksField]),
           styleComp.of(styleTheme(s)),
           editableComp.of(EditorView.editable.of(true)),
           colComp.of([]),
@@ -360,6 +399,27 @@ export default function Editor({
     if (!view) return;
     view.dispatch({ effects: setAnnotationsEffect.of(annotations) });
   }, [annotations]);
+
+  // 查找高亮变化 → 应用装饰
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({ effects: setSearchMarksEffect.of(searchMarks) });
+  }, [searchMarks]);
+
+  // 跳转到某个匹配
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !gotoRequest) return;
+    const len = view.state.doc.length;
+    const from = Math.max(0, Math.min(gotoRequest.from, len));
+    const to = Math.max(from, Math.min(gotoRequest.to, len));
+    view.dispatch({
+      selection: EditorSelection.range(from, to),
+      effects: EditorView.scrollIntoView(EditorSelection.range(from, to), { y: "center" }),
+    });
+    view.focus();
+  }, [gotoRequest]);
 
   // 只读 / 列编辑模式变化
   useEffect(() => {
@@ -488,6 +548,17 @@ export default function Editor({
         selection: { anchor: sel.head + actionSignal.text.length },
         scrollIntoView: true,
       });
+    } else if (actionSignal.type === "goto-line" && actionSignal.text) {
+      // 跳到指定行并把光标放到行首（跨文件夹搜索结果跳转）
+      const n = Number(actionSignal.text);
+      if (Number.isFinite(n) && n >= 1 && n <= view.state.doc.lines) {
+        const line = view.state.doc.line(n);
+        view.dispatch({
+          selection: EditorSelection.cursor(line.from),
+          effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+        });
+        view.focus();
+      }
     } else if (actionSignal.type === "goto") {
       // 跳到行（在 App 中解析）
     }
