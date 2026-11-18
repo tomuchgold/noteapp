@@ -573,13 +573,21 @@ export default function Editor({
   }
 
   // 右键：弹出 标注 + AI 动作 菜单
+  // 注意：右键的 mousedown 会把 CodeMirror 选区 collapse 到点击处，
+  // 所以在 contextmenu 阶段读 selection 可能已为空 —— 右键前缓存一份。
+  const selCacheRef = useRef<{ from: number; to: number; text: string } | null>(null);
   function handleContextMenu(e: React.MouseEvent) {
     const view = viewRef.current;
     if (!view) return;
     const sel = view.state.selection.main;
+    if (!sel.empty) {
+      const text = view.state.sliceDoc(sel.from, sel.to);
+      if (text.trim()) selCacheRef.current = { from: sel.from, to: sel.to, text };
+    }
     const hits = hitAnnotations();
-    if (sel.empty && hits.length === 0) return; // 无选区且未命中标注 → 保留默认菜单
-    const text = sel.empty ? "" : view.state.sliceDoc(sel.from, sel.to);
+    const cached = selCacheRef.current;
+    if (sel.empty && hits.length === 0 && !cached) return; // 无选区且未命中标注 → 保留默认菜单
+    const text = sel.empty ? cached?.text ?? "" : view.state.sliceDoc(sel.from, sel.to);
     if (!sel.empty && !text.trim()) return;
     e.preventDefault();
     setAiMenu({
@@ -594,8 +602,12 @@ export default function Editor({
     const view = viewRef.current;
     if (!view) return null;
     const sel = view.state.selection.main;
-    if (sel.empty) return null;
-    return { from: sel.from, to: sel.to, text: view.state.sliceDoc(sel.from, sel.to) };
+    if (!sel.empty) {
+      const text = view.state.sliceDoc(sel.from, sel.to);
+      if (text.trim()) return { from: sel.from, to: sel.to, text };
+    }
+    // 选区被右键 collapse 时用缓存
+    return selCacheRef.current;
   }
 
   function annotate(kind: AnnotationKind, color?: string) {

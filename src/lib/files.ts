@@ -70,8 +70,8 @@ export function listDir(path: string): Promise<DirEntryInfo[]> {
   return invoke("list_dir", { path });
 }
 
-/** 文件大小（打开前判断是否进入大文件模式） */
-export function fileInfo(path: string): Promise<{ size: number }> {
+/** 文件信息（打开前判断是否进入大文件模式；外部变更监听用 mtime） */
+export function fileInfo(path: string): Promise<{ size: number; mtime: number }> {
   return invoke("file_info", { path });
 }
 

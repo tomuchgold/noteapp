@@ -197,16 +197,24 @@ pub fn list_dir(path: String) -> Result<Vec<DirEntry>, String> {
     Ok(entries)
 }
 
-/// 文件大小查询（打开前判断是否进入大文件模式）
+/// 文件大小 / 修改时间查询（打开前判断是否进入大文件模式；外部变更监听用）
 #[derive(Serialize, Deserialize)]
 pub struct FileInfo {
     pub size: u64,
+    /// 最后修改时间（Unix 秒；无法取得时为 0）
+    pub mtime: i64,
 }
 
 #[tauri::command]
 pub fn file_info(path: String) -> Result<FileInfo, String> {
     let meta = fs::metadata(&path).map_err(|e| format!("读取文件信息失败：{}", e))?;
-    Ok(FileInfo { size: meta.len() })
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    Ok(FileInfo { size: meta.len(), mtime })
 }
 
 /// 拷贝媒体/附件文件到文档同目录的 media/ 下，返回相对引用路径（media/xxx.ext）。

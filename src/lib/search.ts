@@ -177,3 +177,70 @@ export interface FolderHitGroup {
   name: string;
   hits: FolderHit[];
 }
+
+/** 结果面板中的一行：行号 + 行文本 + 该行内的命中区间（按字符偏移，用于高亮） */
+export interface LineHit {
+  line: number;
+  text: string;
+  /** 命中区间（行内偏移） */
+  ranges: Array<{ start: number; end: number }>;
+}
+
+/**
+ * 把全局匹配按行聚合为结果面板条目（Notepad++ 风格）。
+ * 匹配跨行时按各自所在的行拆开。
+ */
+export function lineHits(text: string, matches: Match[], maxLines = 5000): LineHit[] {
+  if (matches.length === 0) return [];
+  const lineStarts: number[] = [0];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "\n") lineStarts.push(i + 1);
+  }
+  const byLine = new Map<number, Array<{ start: number; end: number }>>();
+  for (const m of matches) {
+    // 命中覆盖到的每一行都要记一条区间
+    let start = m.from;
+    while (start < m.to) {
+      // 该字符所在行
+      let lo = 0;
+      let hi = lineStarts.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (lineStarts[mid] <= start) lo = mid;
+        else hi = mid - 1;
+      }
+      const lineNo = lo;
+      const lineEnd = lineNo + 1 < lineStarts.length ? lineStarts[lineNo + 1] - 1 : text.length;
+      const segEnd = Math.min(m.to, lineEnd);
+      const arr = byLine.get(lineNo) ?? [];
+      arr.push({ start: start - lineStarts[lineNo], end: segEnd - lineStarts[lineNo] });
+      byLine.set(lineNo, arr);
+      start = lineEnd + 1;
+    }
+  }
+  const lines = text.split("\n");
+  const out: LineHit[] = [];
+  for (const [lineNo, ranges] of [...byLine.entries()].sort((a, b) => a[0] - b[0])) {
+    if (out.length >= maxLines) break;
+    // 合并重叠区间
+    ranges.sort((a, b) => a.start - b.start);
+    const merged: typeof ranges = [];
+    for (const r of ranges) {
+      const last = merged[merged.length - 1];
+      if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
+      else merged.push({ ...r });
+    }
+    out.push({ line: lineNo + 1, text: lines[lineNo] ?? "", ranges: merged });
+  }
+  return out;
+}
+
+/** 结果面板条目点击 → 该行第一个命中的全局位置（跳转用；超出末行返回文档末尾） */
+export function lineHitPos(text: string, line: number): number {
+  const lines = text.split("\n");
+  let pos = 0;
+  for (let i = 0; i < Math.min(line - 1, lines.length); i++) {
+    pos += lines[i].length + (i + 1 < lines.length ? 1 : 0);
+  }
+  return pos;
+}

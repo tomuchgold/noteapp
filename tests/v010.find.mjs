@@ -118,7 +118,7 @@ await page.keyboard.press("Enter");
 await page.waitForTimeout(250);
 const after = await page.locator(".findbar-count").innerText();
 check("回车跳到下一处（1 → 2）", after.includes("2 / 5"), after);
-await page.locator(".findbar-btn").nth(1).click();
+await page.locator('.findbar-btn[title*="下一处"]').click();
 await page.waitForTimeout(250);
 const after2 = await page.locator(".findbar-count").innerText();
 check("↓ 按钮继续下一处（2 → 3）", after2.includes("3 / 5"), after2);

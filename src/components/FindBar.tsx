@@ -28,6 +28,9 @@ export interface FindBarProps {
   onClose: () => void;
   /** 从编辑器选区带入的查找词 */
   seed?: string;
+  /** 结果面板显隐与开关 */
+  resultsOpen?: boolean;
+  onToggleResults?: () => void;
 }
 
 type Tab = "file" | "folder";
@@ -36,7 +39,7 @@ export default function FindBar(props: FindBarProps) {
   const {
     open, total, current, options, query, folderRoot, folderHits, folderLoading,
     folderMessage, onQuery, onOptions, onStep, onReplace, onReplaceAll,
-    onFolderSearch, onOpenHit, onClose, seed, replaceMessage,
+    onFolderSearch, onOpenHit, onClose, seed, replaceMessage, resultsOpen, onToggleResults,
   } = props;
 
   const [tab, setTab] = useState<Tab>("file");
@@ -103,6 +106,15 @@ export default function FindBar(props: FindBarProps) {
           在文件夹中
         </button>
         <span className="spacer" />
+        {onToggleResults && (
+          <button
+            className={`findbar-btn wide ${resultsOpen ? "on" : ""}`}
+            onClick={onToggleResults}
+            title="显示/隐藏搜索结果面板（行内容列表，点击跳行）"
+          >
+            结果面板
+          </button>
+        )}
         <button className="findbar-close" onClick={onClose} title="关闭 (Esc)">×</button>
       </div>
 

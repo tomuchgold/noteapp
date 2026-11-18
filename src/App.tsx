@@ -13,10 +13,15 @@ import Splitter from "./components/Splitter";
 import InsertTableDialog from "./components/InsertTableDialog";
 import PreviewDialog from "./components/PreviewDialog";
 import FindBar from "./components/FindBar";
+import SearchResults from "./components/SearchResults";
+import AnnoPanel from "./components/AnnoPanel";
+import { printDocument } from "./lib/print";
 import {
   applyCase,
   DEFAULT_OPTIONS,
   findAll,
+  lineHitPos,
+  lineHits,
   replaceAll,
   type FolderHitGroup,
   type SearchOptions,
@@ -303,6 +308,22 @@ export default function App() {
     [findMatches, findCurrent]
   );
 
+  // ---------- 搜索结果面板（Notepad++ 风格：行号+行内容+点击跳行） ----------
+  const [resultsOpen, setResultsOpen] = useState(false);
+  /** 命中按行聚合（结果面板数据源） */
+  const searchLineHits = useMemo(
+    () => (activeTab ? lineHits(activeTab.content, findMatches) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTab?.content, findMatches]
+  );
+  /** 当前命中所在行（面板中加粗定位） */
+  const currentMatchLine = useMemo(() => {
+    const m = findMatches[findCurrent];
+    if (!m || !activeTab) return null;
+    return activeTab.content.slice(0, m.from).split("\n").length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findMatches, findCurrent, activeTab?.content]);
+
   /** 当前查找位置的位置指针；null 表示还没跳过（下次跳第一处） */
   const findPosRef = useRef<number | null>(null);
   /** 当前序号（与 findCurrent 同步，供 stepFind 读取最新值） */
@@ -359,6 +380,18 @@ export default function App() {
       gotoMatch(target);
     },
     [findMatches, gotoMatch]
+  );
+
+  /** 点击结果面板某行 → 跳到该行第一个命中 */
+  const jumpToResultLine = useCallback(
+    (line: number) => {
+      if (!activeTab) return;
+      const pos = lineHitPos(activeTab.content, line);
+      let idx = findMatches.findIndex((m) => m.from >= pos);
+      if (idx < 0) idx = 0;
+      gotoMatch(idx);
+    },
+    [activeTab, findMatches, gotoMatch]
   );
 
   /** 替换当前命中 */
@@ -478,6 +511,14 @@ export default function App() {
     [activePath]
   );
 
+  // ---------- 标注导航面板 ----------
+  const [annoOpen, setAnnoOpen] = useState(false);
+  /** 点击标注列表项 → 跳到标注位置 */
+  const jumpToAnnotation = useCallback((ann: Annotation) => {
+    gotoSeq.current += 1;
+    setGotoRequest({ n: gotoSeq.current, from: ann.from, to: ann.to });
+  }, []);
+
   // ---------- 插入表格 / Markdown 预览 ----------
   const [tableOpen, setTableOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -502,6 +543,33 @@ export default function App() {
       alert(`导出失败：${e}`);
     }
   }, [activeTab]);
+
+  /** 打印 / 导出 PDF（打印机选「另存为 PDF」） */
+  const doPrint = useCallback(() => {
+    if (!activeTab) return;
+    printDocument(
+      activeTab.content,
+      activeTab.name.replace(/\.[^.]+$/, ""),
+      effectiveFontSize(editorSettings),
+      /\.(md|markdown)$/i.test(activeTab.name)
+    );
+  }, [activeTab, editorSettings]);
+
+  // ---------- 分屏对照（左右同时查看两个文件） ----------
+  const [splitId, setSplitId] = useState<string | null>(null);
+  const splitTab = useMemo(() => tabs.find((t) => t.id === splitId) ?? null, [tabs, splitId]);
+  const toggleSplit = useCallback(() => {
+    if (splitId) {
+      setSplitId(null);
+      return;
+    }
+    const other = tabs.find((t) => t.id !== activeId);
+    if (!other) {
+      alert("分屏需要至少两个文件：请再打开一个文件后重试。");
+      return;
+    }
+    setSplitId(other.id);
+  }, [splitId, tabs, activeId]);
 
   // ---------- 拖拽多媒体/附件（引用插入） ----------
   const MEDIA_IMG = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
@@ -720,6 +788,57 @@ export default function App() {
     localStorage.setItem(SESSION_KEY, JSON.stringify({ paths, activePath }));
   }, [tabs, activeId]);
 
+  // ---------- 外部文件变更监听：轮询 mtime/size，磁盘被改时提示/自动重载 ----------
+  const tabsRef = useRef<FileTab[]>([]);
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+  const diskStamps = useRef<Map<string, string>>(new Map());
+  /** 有未保存修改的标签发现磁盘被改 → 弹窗询问 */
+  const [reloadPrompt, setReloadPrompt] = useState<string | null>(null);
+
+  const checkExternalChanges = useCallback(async () => {
+    for (const t of tabsRef.current) {
+      if (!t.path || t.readOnly || t.large) continue;
+      try {
+        const info = await fileInfo(t.path);
+        const stamp = `${info.size}:${info.mtime}`;
+        const prev = diskStamps.current.get(t.path);
+        if (prev === undefined) {
+          diskStamps.current.set(t.path, stamp);
+          continue;
+        }
+        if (prev === stamp) continue;
+        diskStamps.current.set(t.path, stamp);
+        if (t.dirty) {
+          setReloadPrompt(t.id);
+        } else {
+          // 未编辑：静默重载最新内容
+          const res = await readTextFile(t.path);
+          updateTab(t.id, {
+            content: res.content,
+            encoding: res.encoding,
+            bom: res.bom,
+            eol: (["LF", "CRLF", "CR", "MIXED"].includes(res.eol) ? res.eol : "LF") as FileTab["eol"],
+            dirty: false,
+          });
+        }
+      } catch {
+        // 文件被移动/删除/暂不可读：忽略，不干扰编辑
+      }
+    }
+  }, [updateTab]);
+
+  useEffect(() => {
+    const iv = window.setInterval(() => void checkExternalChanges(), 3000);
+    const onFocus = () => void checkExternalChanges();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(iv);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [checkExternalChanges]);
+
   /** 保存；forceDialog 用于另存为。返回是否成功保存 */
   const saveTab = useCallback(async (tab: FileTab, forceDialog = false): Promise<boolean> => {
     if (tab.readOnly) {
@@ -909,6 +1028,10 @@ export default function App() {
         // Ctrl+0 复位缩放 100%
         e.preventDefault();
         resetZoom();
+      } else if (key === "p" && !e.shiftKey) {
+        // Ctrl+P 打印 / 导出 PDF
+        e.preventDefault();
+        doPrint();
       } else if (key === "tab") {
         e.preventDefault();
         if (tabs.length > 1 && activeId) {
@@ -919,7 +1042,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [newTab, openDialog, saveTab, closeTab, activeTab, activeId, tabs, toggleRecord, replayMacro, openFind, stepFind]);
+  }, [newTab, openDialog, saveTab, closeTab, activeTab, activeId, tabs, toggleRecord, replayMacro, openFind, stepFind, doPrint]);
 
   // 状态栏点击：循环切换保存编码
   useEffect(() => {
@@ -961,6 +1084,59 @@ export default function App() {
       unlisten.then((fn) => fn());
     };
   }, [openPath, insertMedia]);
+
+  // ---------- 移动端：双指捏合调整字号（对应桌面 Ctrl+滚轮） ----------
+  const zoomRef = useRef(editorSettings.zoom);
+  useEffect(() => {
+    zoomRef.current = editorSettings.zoom;
+  }, [editorSettings.zoom]);
+  useEffect(() => {
+    let startDist = 0;
+    let startZoom = 100;
+    const dist = (e: TouchEvent) =>
+      Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        startDist = dist(e);
+        startZoom = zoomRef.current;
+      }
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && startDist > 0) {
+        const z = Math.round((startZoom * dist(e)) / startDist / 5) * 5;
+        setEditorSettings((s) => clampSettings({ ...s, zoom: z }));
+        e.preventDefault(); // 阻止页面级缩放
+      }
+    };
+    const onEnd = () => {
+      startDist = 0;
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchcancel", onEnd);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, []);
+
+  // ---------- 移动端：软键盘弹出时保证输入位置可见 ----------
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.scrollIntoView({ block: "nearest" });
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   // 标题栏
   useEffect(() => {
@@ -1041,6 +1217,29 @@ export default function App() {
           title="Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览"
         >
           预览
+        </button>
+        <button
+          onClick={doPrint}
+          disabled={!activeTab}
+          className="menubar-secondary"
+          title="打印 / 导出 PDF（按当前缩放字号；打印对话框里选「另存为 PDF」）"
+        >
+          打印
+        </button>
+        <button
+          onClick={() => setAnnoOpen((v) => !v)}
+          disabled={!activeTab}
+          className={annoOpen ? "on" : ""}
+          title="标注导航：当前文件所有划线/高亮/备注列表，点击跳转"
+        >
+          标注
+        </button>
+        <button
+          onClick={toggleSplit}
+          className={splitId ? "on" : ""}
+          title="分屏对照：左右同时查看两个文件（再次点击关闭）"
+        >
+          分屏
         </button>
         <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置">
           设置
@@ -1169,11 +1368,12 @@ export default function App() {
             onClose={closeTab}
           />
 
-      <div
-        className="editor-area"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => e.preventDefault()}
-      >
+        <div className="editor-row">
+        <div
+          className="editor-area"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => e.preventDefault()}
+        >
         {diff ? (
           <DiffView
             aText={diff.aText}
@@ -1233,6 +1433,47 @@ export default function App() {
         )}
       </div>
 
+      {splitTab && (
+        <div className="editor-area editor-split">
+          <div className="editor-split-head">
+            <select
+              value={splitTab.id}
+              onChange={(e) => setSplitId(e.target.value)}
+              title="选择右侧分屏显示的文件"
+            >
+              {tabs.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <button onClick={() => setSplitId(null)} title="关闭分屏">×</button>
+          </div>
+          <Editor
+            key={`split-${splitTab.id}`}
+            content={splitTab.content}
+            languagePath={splitTab.path}
+            onChange={(v) => updateTab(splitTab.id, { content: v, dirty: true })}
+            onCursor={() => {}}
+            actionSignal={null}
+            settings={editorSettings}
+            onZoom={zoomEditor}
+            readOnly={splitTab.readOnly}
+          />
+        </div>
+      )}
+      </div>
+
+      {activeTab && (
+        <AnnoPanel
+          open={annoOpen}
+          annotations={annotations}
+          onJump={jumpToAnnotation}
+          onDelete={handleDeleteAnnotation}
+          onClose={() => setAnnoOpen(false)}
+        />
+      )}
+
       {activeTab && (
         <FindBar
           open={findOpen}
@@ -1254,6 +1495,19 @@ export default function App() {
           onClose={() => setFindOpen(false)}
           seed={findSeed}
           replaceMessage={replaceMsg}
+          resultsOpen={resultsOpen && findOpen}
+          onToggleResults={() => setResultsOpen((v) => !v)}
+        />
+      )}
+
+      {activeTab && (
+        <SearchResults
+          open={resultsOpen && findOpen}
+          title={`查找「${findQuery}」`}
+          hits={searchLineHits}
+          activeLine={currentMatchLine}
+          onJump={jumpToResultLine}
+          onClose={() => setResultsOpen(false)}
         />
       )}
 
@@ -1397,6 +1651,44 @@ export default function App() {
           onClose={() => setAiJob(null)}
           onRetry={() => void runAi(aiJob.action, aiJob.source, aiJob.custom)}
         />
+      )}
+
+      {/* 外部修改提示 */}
+      {reloadPrompt && (
+        <div className="modal-mask">
+          <div className="modal">
+            <p>
+              「{tabs.find((t) => t.id === reloadPrompt)?.name}」已在磁盘上被其他程序修改，
+              你还有未保存的编辑。
+            </p>
+            <div className="modal-actions">
+              <button
+                className="primary"
+                onClick={async () => {
+                  const id = reloadPrompt;
+                  setReloadPrompt(null);
+                  const t = tabsRef.current.find((x) => x.id === id);
+                  if (!t?.path) return;
+                  try {
+                    const res = await readTextFile(t.path);
+                    updateTab(id, {
+                      content: res.content,
+                      encoding: res.encoding,
+                      bom: res.bom,
+                      eol: (["LF", "CRLF", "CR", "MIXED"].includes(res.eol) ? res.eol : "LF") as FileTab["eol"],
+                      dirty: false,
+                    });
+                  } catch (e) {
+                    alert(`重新加载失败：${e}`);
+                  }
+                }}
+              >
+                重新加载（放弃我的修改）
+              </button>
+              <button onClick={() => setReloadPrompt(null)}>保留我的版本</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 标签右键菜单（简化实现）：点击空白处自动关闭 */}
