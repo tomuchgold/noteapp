@@ -5,7 +5,7 @@ import { highlightActiveLineGutter, highlightActiveLine } from "@codemirror/view
 import { history } from "@codemirror/commands";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { detectLanguage } from "../lib/lang";
-import { markdownToHtml } from "./PreviewDialog";
+import { markdownToHtml, enhanceMarkdownDom } from "../lib/markdown";
 
 interface Props {
   aText: string;
@@ -54,6 +54,14 @@ export default function DiffView({ aText, bText, aName, bName, onClose }: Props)
   const htmlA = useMemo(() => (isMarkdown(aName) ? markdownToHtml(aText) : null), [aText, aName]);
   const htmlB = useMemo(() => (isMarkdown(bName) ? markdownToHtml(bText) : null), [bText, bName]);
 
+  // mermaid 异步增强（切到预览模式后执行）
+  const hostPreviewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mode === "preview" && hostPreviewRef.current) {
+      void enhanceMarkdownDom(hostPreviewRef.current);
+    }
+  }, [mode, htmlA, htmlB]);
+
   return (
     <div className="diff-wrap">
       <div className="diff-header">
@@ -81,7 +89,7 @@ export default function DiffView({ aText, bText, aName, bName, onClose }: Props)
       {mode === "diff" ? (
         <div className="diff-host" ref={hostRef} />
       ) : (
-        <div className="diff-preview">
+        <div className="diff-preview" ref={hostPreviewRef}>
           <div className="diff-preview-pane">
             <div className="diff-preview-head">{aName}</div>
             {htmlA !== null ? (

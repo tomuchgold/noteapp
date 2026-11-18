@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { marked } from "marked";
+import { useEffect, useMemo, useRef } from "react";
+import { markdownToHtml, enhanceMarkdownDom, EXPORT_EXTRAS_HEAD } from "../lib/markdown";
 
 interface Props {
   /** 文档名（导出 HTML 默认文件名） */
@@ -13,8 +13,6 @@ interface Props {
   onClose: () => void;
 }
 
-marked.setOptions({ gfm: true, breaks: false });
-
 /** 导出用的整页 HTML 模板（带样式，可直接浏览器打开 / 打印为 PDF） */
 function buildHtmlDoc(bodyHtml: string, title: string, fontSize: number): string {
   return `<!doctype html>
@@ -22,6 +20,7 @@ function buildHtmlDoc(bodyHtml: string, title: string, fontSize: number): string
 <head>
 <meta charset="utf-8">
 <title>${title.replace(/[<>&"]/g, "")}</title>
+${EXPORT_EXTRAS_HEAD}
 <style>
   body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
          margin: 48px auto; max-width: 820px; line-height: 1.8; color: #24292f; font-size: ${fontSize}px; background: #fff; }
@@ -44,10 +43,6 @@ ${bodyHtml}
 </html>`;
 }
 
-export function markdownToHtml(source: string): string {
-  return marked.parse(source, { async: false }) as string;
-}
-
 export function exportHtmlPayload(source: string, title: string, fontSize: number, isMarkdown = true): string {
   const body = isMarkdown
     ? markdownToHtml(source)
@@ -67,6 +62,13 @@ export default function PreviewDialog({ title, source, fontSize = 14, onExportHt
       return `<p>渲染失败：${String(e)}</p>`;
     }
   }, [source, isMarkdown]);
+
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // mermaid 等异步增强：innerHTML 写入后执行
+  useEffect(() => {
+    if (bodyRef.current) void enhanceMarkdownDom(bodyRef.current);
+  }, [html]);
 
   const exportHtml = () => {
     const doc = exportHtmlPayload(source, title, fontSize, isMarkdown);
@@ -94,7 +96,7 @@ export default function PreviewDialog({ title, source, fontSize = 14, onExportHt
             <button className="primary" onClick={onClose}>关闭</button>
           </div>
         </div>
-        <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="markdown-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: html }} />
       </div>
     </div>
   );
