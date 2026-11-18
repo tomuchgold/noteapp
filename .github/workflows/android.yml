@@ -71,30 +71,30 @@ jobs:
       - name: 生成 Android 工程
         run: pnpm tauri android init --ci
 
-      - name: 注入签名配置
+      - name: 注入签名配置（Kotlin DSL）
         run: |
           KSTORE="$GITHUB_WORKSPACE/src-tauri/notepp-release.keystore"
           cp "$KSTORE" "$GITHUB_WORKSPACE/src-tauri/gen/android/app/notepp-release.keystore"
-          cat > /tmp/signing.gradle <<EOF
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file("notepp-release.keystore")
-                      storePassword "notepp123"
-                      keyAlias "notepp"
-                      keyPassword "notepp123"
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
-              }
-          }
-          EOF
-          # 追加到 app 模块的 gradle 配置末尾
-          cat /tmp/signing.gradle >> "$GITHUB_WORKSPACE/src-tauri/gen/android/app/build.gradle.kts"
-          echo "签名配置已注入"
+          F="$GITHUB_WORKSPACE/src-tauri/gen/android/app/build.gradle.kts"
+          {
+            echo ''
+            echo 'android {'
+            echo '    signingConfigs {'
+            echo '        create("noteppRelease") {'
+            echo '            storeFile = file("notepp-release.keystore")'
+            echo '            storePassword = "notepp123"'
+            echo '            keyAlias = "notepp"'
+            echo '            keyPassword = "notepp123"'
+            echo '        }'
+            echo '    }'
+            echo '    buildTypes {'
+            echo '        getByName("release") {'
+            echo '            signingConfig = signingConfigs.getByName("noteppRelease")'
+            echo '        }'
+            echo '    }'
+            echo '}'
+          } >> "$F"
+          tail -20 "$F"
 
       - name: 构建 APK
         run: pnpm tauri android build --apk
