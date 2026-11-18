@@ -811,6 +811,13 @@ export default function App() {
         if (prev === stamp) continue;
         diskStamps.current.set(t.path, stamp);
         if (t.dirty) {
+          // 内容相同（如 touch / 同步软件原样重写）不提示，避免误判
+          try {
+            const res = await readTextFile(t.path);
+            if (res.content === t.content) continue;
+          } catch {
+            /* 读不到按有变化处理 */
+          }
           setReloadPrompt(t.id);
         } else {
           // 未编辑：静默重载最新内容
@@ -860,6 +867,15 @@ export default function App() {
         bom: tab.bom,
         eol,
       });
+      // 关键：保存成功后刷新该文件的磁盘基线，
+      // 否则下一次监听节拍会把「自己的保存」误判为外部修改，
+      // 弹出「重新加载」导致继续编辑的内容被回退（数据丢失 bug）
+      try {
+        const info = await fileInfo(path);
+        diskStamps.current.set(path, `${info.size}:${info.mtime}`);
+      } catch {
+        diskStamps.current.delete(path);
+      }
       pushRecent(path);
       setRecent(getRecent());
       setLibrary((prev) => upsertFile(prev, path!, tab.content));
@@ -1662,8 +1678,10 @@ export default function App() {
               你还有未保存的编辑。
             </p>
             <div className="modal-actions">
+              <button className="primary" onClick={() => setReloadPrompt(null)}>
+                保留我的版本
+              </button>
               <button
-                className="primary"
                 onClick={async () => {
                   const id = reloadPrompt;
                   setReloadPrompt(null);
@@ -1678,6 +1696,9 @@ export default function App() {
                       eol: (["LF", "CRLF", "CR", "MIXED"].includes(res.eol) ? res.eol : "LF") as FileTab["eol"],
                       dirty: false,
                     });
+                    // 重载后同步磁盘基线，避免后续节拍再次误判
+                    const info = await fileInfo(t.path);
+                    diskStamps.current.set(t.path, `${info.size}:${info.mtime}`);
                   } catch (e) {
                     alert(`重新加载失败：${e}`);
                   }
@@ -1685,7 +1706,6 @@ export default function App() {
               >
                 重新加载（放弃我的修改）
               </button>
-              <button onClick={() => setReloadPrompt(null)}>保留我的版本</button>
             </div>
           </div>
         </div>

@@ -20,6 +20,8 @@ export interface EditorSettings {
   activeLine: boolean;
   /** 当前段落高亮（亮色背景，覆盖光标所在整段） */
   paragraphHighlight: boolean;
+  /** 光标行/段落高亮颜色（空 = 跟随当前主题） */
+  paraColor: string;
   /** 编辑器主题（主题注册表 id，内置或自定义） */
   theme: string;
 }
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   showWhitespace: false,
   activeLine: true,
   paragraphHighlight: true,
+  paraColor: "",
   theme: "dark",
 };
 
@@ -76,6 +79,7 @@ export function clampSettings(s: EditorSettings): EditorSettings {
     showWhitespace: !!s.showWhitespace,
     activeLine: !!s.activeLine,
     paragraphHighlight: !!s.paragraphHighlight,
+    paraColor: typeof s.paraColor === "string" ? s.paraColor : "",
     theme: typeof s.theme === "string" && s.theme ? s.theme : DEFAULT_SETTINGS.theme,
   };
 }

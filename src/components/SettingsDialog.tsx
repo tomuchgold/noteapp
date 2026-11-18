@@ -198,6 +198,27 @@ export default function SettingsDialog({ value, onChange, onClose }: Props) {
           />
         </div>
 
+        <div className="setting-row">
+          <label>
+            高亮颜色
+            <span className="dim">{value.paraColor ? "自定义" : "跟随主题"}</span>
+          </label>
+          <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="color"
+              value={value.paraColor || "#3a4256"}
+              disabled={!value.paragraphHighlight && !value.activeLine}
+              onChange={(e) => set({ paraColor: e.target.value })}
+              title="光标所在行/段落的高亮背景色"
+            />
+            {value.paraColor && (
+              <button onClick={() => set({ paraColor: "" })} title="恢复为当前主题的配色">
+                跟随主题
+              </button>
+            )}
+          </span>
+        </div>
+
         <div className="modal-actions">
           <button onClick={() => onChange({ ...DEFAULT_SETTINGS })}>恢复默认</button>
           <button className="primary" onClick={onClose}>

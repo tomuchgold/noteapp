@@ -391,6 +391,11 @@ export default function Editor({
         themeComp.reconfigure(themeFromDef(findTheme(settings.theme))),
       ],
     });
+    // 光标行高亮颜色：用户设定优先，否则跟随主题
+    hostRef.current?.style.setProperty(
+      "--np-para",
+      settings.paraColor || findTheme(settings.theme).colors.para
+    );
   }, [settings]);
 
   // 标注变化 → 应用装饰

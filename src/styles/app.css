@@ -1305,6 +1305,10 @@ button.link {
 .editor-host .cm-line.cm-para-line {
   background-color: var(--np-para, #333846) !important;
 }
+/* 当前行高亮同样使用可配置颜色（v0.11.3） */
+.editor-host .cm-activeLine {
+  background-color: var(--np-para, transparent) !important;
+}
 
 /* 标注：高亮（颜色由内联样式给出）/ 划线 */
 .editor-host .cm-ann-hl {
