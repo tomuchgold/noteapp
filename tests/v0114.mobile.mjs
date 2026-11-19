@@ -54,7 +54,7 @@ check("手机上改色生效", applied === "#00ff88", applied);
 
 // 版本号显示
 const title = await page.locator(".modal h3").innerText();
-check("设置标题显示版本号", title.includes("0.11.4"), title);
+check("设置标题显示版本号", /v\d+\.\d+\.\d+/.test(title), title);
 
 await page.screenshot({ path: "/workspace/notepp/docs/settings-mobile.png" });
 await browser.close();

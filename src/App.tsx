@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import Editor from "./components/Editor";
 import TabBar from "./components/TabBar";
 import StatusBar from "./components/StatusBar";
@@ -453,9 +454,46 @@ export default function App() {
     [folderRoot]
   );
 
-  /** 打开文件夹搜索结果：打开文件并跳到对应行 */
+  /** 所有已打开标签中查找（内存搜索，不改底部结果面板） */
+  const [tabHits, setTabHits] = useState<FolderHitGroup[]>([]);
+  const [tabMessage, setTabMessage] = useState<string | null>(null);
+  const doTabsSearch = useCallback(
+    (q: string, opt: SearchOptions) => {
+      if (!q) return;
+      const groups: FolderHitGroup[] = [];
+      for (const t of tabsRef.current) {
+        if (t.large) continue;
+        const matches = findAll(t.content, q, opt);
+        if (matches.length === 0) continue;
+        const key = t.path ?? `tab:${t.id}`;
+        groups.push({
+          path: key,
+          name: t.path ? baseName(t.path) : `未保存 - ${t.name}`,
+          hits: lineHits(t.content, matches).map((h) => ({
+            path: key,
+            line: h.line,
+            text: h.text,
+            col: h.ranges[0]?.start ?? 0,
+          })),
+        });
+      }
+      setTabHits(groups);
+      setTabMessage(groups.length === 0 ? "已打开的标签中没有匹配结果" : null);
+    },
+    []
+  );
+
+  /** 打开文件夹搜索结果：打开文件并跳到对应行；标签结果则直接切换标签 */
   const openFolderHit = useCallback(
     async (path: string, line: number) => {
+      if (path.startsWith("tab:")) {
+        const id = path.slice(4);
+        setActiveId(id);
+        window.setTimeout(() => {
+          setActionSignal({ type: "goto-line", n: ++actionCount.current, text: String(line) });
+        }, 200);
+        return;
+      }
       await openPathRef.current(path);
       // 等标签挂载后跳到该行
       window.setTimeout(() => {
@@ -998,6 +1036,11 @@ export default function App() {
   // ---------- 快捷键 ----------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Esc 关闭查找浮窗（焦点不在浮窗内时也要生效）
+      if (e.key === "Escape" && findOpen) {
+        setFindOpen(false);
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const key = e.key.toLowerCase();
@@ -1058,7 +1101,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [newTab, openDialog, saveTab, closeTab, activeTab, activeId, tabs, toggleRecord, replayMacro, openFind, stepFind, doPrint]);
+  }, [newTab, openDialog, saveTab, closeTab, activeTab, activeId, tabs, toggleRecord, replayMacro, openFind, stepFind, doPrint, findOpen]);
 
   // 状态栏点击：循环切换保存编码
   useEffect(() => {
@@ -1284,6 +1327,13 @@ export default function App() {
         >
           AI
         </button>
+        <button
+          className="menubar-secondary"
+          onClick={() => void openUrl("https://notepp.ambook.vip")}
+          title="访问官网 notepp.ambook.vip（在系统浏览器中打开）"
+        >
+          我的网站
+        </button>
         <span className="spacer" />
         {recent.length > 0 && (
           <select
@@ -1501,12 +1551,15 @@ export default function App() {
           folderHits={folderHits}
           folderLoading={folderLoading}
           folderMessage={folderMessage}
+          tabHits={tabHits}
+          tabMessage={tabMessage}
           onQuery={setFindQuery}
           onOptions={setFindOptions}
           onStep={stepFind}
           onReplace={doReplace}
           onReplaceAll={doReplaceAll}
           onFolderSearch={(q, o) => void doFolderSearch(q, o)}
+          onTabsSearch={(q, o) => doTabsSearch(q, o)}
           onOpenHit={(p, l) => void openFolderHit(p, l)}
           onClose={() => setFindOpen(false)}
           seed={findSeed}

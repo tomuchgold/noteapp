@@ -14,6 +14,9 @@ export interface FindBarProps {
   folderHits: FolderHitGroup[];
   folderLoading: boolean;
   folderMessage: string | null;
+  /** 所有打开标签的搜索结果 */
+  tabHits: FolderHitGroup[];
+  tabMessage: string | null;
   /** 替换结果提示（如「已替换 12 处」） */
   replaceMessage?: string | null;
   onQuery: (q: string) => void;
@@ -24,6 +27,8 @@ export interface FindBarProps {
   onReplaceAll: (replacement: string) => void;
   /** 在文件夹中查找 */
   onFolderSearch: (q: string, o: SearchOptions) => void;
+  /** 在所有打开的标签中查找 */
+  onTabsSearch: (q: string, o: SearchOptions) => void;
   onOpenHit: (path: string, line: number) => void;
   onClose: () => void;
   /** 从编辑器选区带入的查找词 */
@@ -33,18 +38,51 @@ export interface FindBarProps {
   onToggleResults?: () => void;
 }
 
-type Tab = "file" | "folder";
+type Tab = "file" | "folder" | "tabs";
+
+/** 浮窗位置持久化 */
+const POS_KEY = "notepp.find.pos";
+function loadPos(): { x: number; y: number } {
+  try {
+    const p = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return p;
+  } catch { /* ignore */ }
+  return { x: Math.max(12, Math.round((window.innerWidth - 620) / 2)), y: 72 };
+}
 
 export default function FindBar(props: FindBarProps) {
   const {
     open, total, current, options, query, folderRoot, folderHits, folderLoading,
-    folderMessage, onQuery, onOptions, onStep, onReplace, onReplaceAll,
-    onFolderSearch, onOpenHit, onClose, seed, replaceMessage, resultsOpen, onToggleResults,
+    folderMessage, tabHits, tabMessage, onQuery, onOptions, onStep, onReplace, onReplaceAll,
+    onFolderSearch, onTabsSearch, onOpenHit, onClose, seed, replaceMessage, resultsOpen, onToggleResults,
   } = props;
 
   const [tab, setTab] = useState<Tab>("file");
   const [replacement, setReplacement] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [pos, setPos] = useState(loadPos);
+  const posRef = useRef(pos);
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  // 拖动浮窗：按住标题栏空白处拖动（排除按钮/输入框）
+  const onDragStart = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button, input, select")) return;
+    dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onDragMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const x = Math.min(Math.max(4, e.clientX - d.dx), Math.max(4, window.innerWidth - 180));
+    const y = Math.min(Math.max(4, e.clientY - d.dy), Math.max(4, window.innerHeight - 48));
+    posRef.current = { x, y };
+    setPos(posRef.current);
+  };
+  const onDragEnd = () => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    localStorage.setItem(POS_KEY, JSON.stringify(posRef.current));
+  };
 
   // 打开时聚焦并全选；从选区带入查找词时一并填入
   useEffect(() => {
@@ -74,6 +112,7 @@ export default function FindBar(props: FindBarProps) {
       if (inReplace) onReplace(replacement);
       else if (inQuery && tab === "file") onStep(e.shiftKey ? -1 : 1);
       else if (tab === "folder") onFolderSearch(query, options);
+      else if (tab === "tabs") onTabsSearch(query, options);
       else onStep(e.shiftKey ? -1 : 1);
     } else if (e.key === "F3") {
       e.preventDefault();
@@ -81,18 +120,38 @@ export default function FindBar(props: FindBarProps) {
     }
   };
 
-  const hitGroups = folderHits.length;
-  const hitCount = folderHits.reduce((n, g) => n + g.hits.length, 0);
+  const groups = tab === "folder" ? folderHits : tab === "tabs" ? tabHits : [];
+  const groupMessage = tab === "folder" ? folderMessage : tabMessage;
+  const hitGroups = groups.length;
+  const hitCount = groups.reduce((n, g) => n + g.hits.length, 0);
 
   return (
-    <div className="findbar" onKeyDown={onKeyDown}>
-      <div className="findbar-tabs">
+    <div className="findbar" onKeyDown={onKeyDown} style={{ left: pos.x, top: pos.y }}>
+      <div
+        className="findbar-tabs"
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        title="拖动标题栏可移动查找窗口"
+      >
+        <span className="findbar-drag">⠿</span>
         <button
           className={tab === "file" ? "on" : ""}
           onClick={() => setTab("file")}
           title="在当前文件内查找"
         >
           当前文件
+        </button>
+        <button
+          className={tab === "tabs" ? "on" : ""}
+          onClick={() => {
+            setTab("tabs");
+            if (query) onTabsSearch(query, options);
+          }}
+          title="在所有已打开的标签中查找"
+        >
+          所有标签
         </button>
         <button
           className={tab === "folder" ? "on" : ""}
@@ -152,8 +211,12 @@ export default function FindBar(props: FindBarProps) {
               <button className="findbar-btn" onClick={() => onStep(1)} title="下一处 (Enter)">↓</button>
             </>
           ) : (
-            <button className="findbar-btn wide" onClick={() => onFolderSearch(query, options)} disabled={folderLoading}>
-              {folderLoading ? "搜索中…" : "搜索"}
+            <button
+              className="findbar-btn wide"
+              onClick={() => tab === "folder" ? onFolderSearch(query, options) : onTabsSearch(query, options)}
+              disabled={tab === "folder" && folderLoading}
+            >
+              {tab === "folder" && folderLoading ? "搜索中…" : "搜索"}
             </button>
           )}
         </div>
@@ -187,20 +250,20 @@ export default function FindBar(props: FindBarProps) {
 
       {replaceMessage && <div className="findbar-toast">{replaceMessage}</div>}
 
-      {tab === "folder" && (
+      {(tab === "folder" || tab === "tabs") && (
         <div className="findbar-results">
           <div className="findbar-results-head">
-            {folderLoading
+            {tab === "folder" && folderLoading
               ? "正在搜索…"
-              : folderMessage
-                ? folderMessage
+              : groupMessage
+                ? groupMessage
                 : hitCount > 0
                   ? `${hitCount} 处命中，${hitGroups} 个文件`
                   : query
                     ? "没有匹配结果"
                     : "输入关键词后回车搜索"}
           </div>
-          {folderHits.map((g) => (
+          {groups.map((g) => (
             <div key={g.path} className="findbar-group">
               <div className="findbar-group-head" title={g.path}>
                 {g.name} <span className="dim">{g.hits.length}</span>
