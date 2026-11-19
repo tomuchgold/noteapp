@@ -118,24 +118,52 @@ const searchMarksField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-/** 按起止坐标算出矩形选区（每行一个区间，多光标同步输入） */
+/**
+ * 按起止「屏幕坐标」算出矩形选区（每行一个区间，多光标同步输入）。
+ * 逐行按 x 像素定位而非字符列——中文/宽字符/Tab 下也能精确对齐。
+ * 对落在行间隙/文档外的坐标用 lineBlockAtHeight 兜底，始终给出稳定的行区间。
+ */
 function buildColumnSelection(view: EditorView, ax: number, ay: number, bx: number, by: number) {
-  const start = view.posAtCoords({ x: ax, y: ay });
-  const cur = view.posAtCoords({ x: bx, y: by });
-  if (start == null || cur == null) return null;
-  const a = view.state.doc.lineAt(start);
-  const b = view.state.doc.lineAt(cur);
-  const c1 = Math.min(start - a.from, cur - b.from);
-  const c2 = Math.max(start - a.from, cur - b.from);
-  const l1 = Math.min(a.number, b.number);
-  const l2 = Math.max(a.number, b.number);
-  const ranges = [];
+  const under = (y: number): number => {
+    // 先试 posAtCoords（能精确到字符），失败再按高度找行块
+    const pos = view.posAtCoords({ x: ax < bx ? ax : bx, y });
+    if (pos != null) return view.state.doc.lineAt(pos).number;
+    const block = view.lineBlockAtHeight(y);
+    return view.state.doc.lineAt(Math.min(Math.max(block.from, 0), view.state.doc.length)).number;
+  };
+  const lineA = under(ay);
+  const lineB = under(by);
+  const l1 = Math.min(lineA, lineB);
+  const l2 = Math.max(lineA, lineB);
+  // 矩形左右边界（视口 x），逐行复用同一 x → 得到真正的「列」
+  const x1 = Math.min(ax, bx);
+  const x2 = Math.max(ax, bx);
+  const ranges: ReturnType<typeof EditorSelection.range>[] = [];
+
+  const lineY = (n: number): number => {
+    const line = view.state.doc.line(n);
+    const block = view.lineBlockAt(line.from);
+    return block.top + block.height / 2; // 相对文档顶部
+  };
+  // 把「相对文档顶部」的 y 转成 posAtCoords 需要的视口 y
+  const scrollTop = view.scrollDOM.scrollTop;
+  const docTop = view.documentTop - scrollTop;
+
   for (let n = l1; n <= l2; n++) {
     const line = view.state.doc.line(n);
-    ranges.push(
-      EditorSelection.range(Math.min(line.from + c1, line.to), Math.min(line.from + c2, line.to))
-    );
+    // 优先用真实坐标拿该行中心 y（视口坐标），失败则按行块推算
+    const c = view.coordsAtPos(line.from);
+    const yViewport = c ? (c.top + c.bottom) / 2 : lineY(n) + docTop;
+    let pa = view.posAtCoords({ x: x1, y: yViewport });
+    let pb = view.posAtCoords({ x: x2, y: yViewport });
+    // 若定位到隔壁行，夹回本行
+    if (pa != null && (pa < line.from || pa > line.to)) pa = pa < line.from ? line.from : line.to;
+    if (pb != null && (pb < line.from || pb > line.to)) pb = pb < line.from ? line.from : line.to;
+    const from = pa == null ? line.from : pa;
+    const to = pb == null ? line.to : pb;
+    ranges.push(EditorSelection.range(Math.min(from, to), Math.max(from, to)));
   }
+  if (!ranges.length) return null;
   return EditorSelection.create(ranges);
 }
 

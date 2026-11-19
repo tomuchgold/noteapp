@@ -24,6 +24,10 @@ export interface EditorSettings {
   paraColor: string;
   /** 编辑器主题（主题注册表 id，内置或自定义） */
   theme: string;
+  /** 整体界面字号倍率（百分比，70–200；影响菜单/侧栏/状态栏等所有 UI） */
+  uiScale: number;
+  /** 查找浮窗字号倍率（百分比，70–200；在界面倍率基础上再叠加） */
+  findScale: number;
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
@@ -37,7 +41,13 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   paragraphHighlight: true,
   paraColor: "",
   theme: "dark",
+  uiScale: 100,
+  findScale: 100,
 };
+
+/** 界面/查找字号倍率范围 */
+export const UI_SCALE_MIN = 70;
+export const UI_SCALE_MAX = 200;
 
 /** 缩放步进（百分比） */
 export const ZOOM_STEP = 10;
@@ -81,6 +91,8 @@ export function clampSettings(s: EditorSettings): EditorSettings {
     paragraphHighlight: !!s.paragraphHighlight,
     paraColor: typeof s.paraColor === "string" ? s.paraColor : "",
     theme: typeof s.theme === "string" && s.theme ? s.theme : DEFAULT_SETTINGS.theme,
+    uiScale: clamp(s.uiScale, UI_SCALE_MIN, UI_SCALE_MAX, DEFAULT_SETTINGS.uiScale),
+    findScale: clamp(s.findScale, UI_SCALE_MIN, UI_SCALE_MAX, DEFAULT_SETTINGS.findScale),
   };
 }
 

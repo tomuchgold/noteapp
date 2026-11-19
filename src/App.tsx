@@ -63,7 +63,8 @@ import {
   saveLayout,
   type LayoutState,
 } from "./lib/layout";
-import { clampSettings, effectiveFontSize, loadSettings, saveSettings, ZOOM_STEP, type EditorSettings } from "./lib/settings";
+import { clampSettings, effectiveFontSize, loadSettings, saveSettings, UI_SCALE_MAX, UI_SCALE_MIN, ZOOM_STEP, type EditorSettings } from "./lib/settings";
+import { findTheme, themeUiVars } from "./lib/themes";
 import {
   loadAnnotations,
   newAnnotationId,
@@ -157,6 +158,37 @@ export default function App() {
   const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => loadSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => saveSettings(editorSettings), [editorSettings]);
+
+  // 把主题配色 + 界面字号倍率注入到根元素，令整个界面（菜单/侧栏/面板/按钮等）随主题变化
+  useEffect(() => {
+    const root = document.documentElement;
+    const theme = findTheme(editorSettings.theme);
+    const vars = themeUiVars(theme);
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    // 光标行竖条跟随自定义高亮色（若设置），否则用主题强调色
+    root.style.setProperty("--np-linebar", editorSettings.paraColor || vars["--ui-linebar"]);
+    // 界面字号倍率：基础 13px → 实际由 CSS calc(13px * var(--ui-scale)) 使用
+    root.style.setProperty("--ui-scale", String(editorSettings.uiScale / 100));
+    root.style.setProperty("--find-scale", String(editorSettings.findScale / 100));
+    // 亮/暗主题标记，供 CSS 做针对性微调
+    root.dataset.theme = theme.dark ? "dark" : "light";
+  }, [editorSettings.theme, editorSettings.uiScale, editorSettings.findScale, editorSettings.paraColor]);
+
+  // 界面字号快捷键：Ctrl/⌘ + [ / ] 缩放 UI（与编辑器正文缩放独立）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (e.key !== "[" && e.key !== "]") return;
+      e.preventDefault();
+      const dir = e.key === "]" ? 1 : -1;
+      setEditorSettings((s) => {
+        const next = Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, s.uiScale + dir * 10));
+        return { ...s, uiScale: next };
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const zoomEditor = useCallback((dir: 1 | -1) => {
     setEditorSettings((s) =>
       clampSettings({ ...s, zoom: s.zoom + dir * ZOOM_STEP })
@@ -1566,6 +1598,8 @@ export default function App() {
           replaceMessage={replaceMsg}
           resultsOpen={resultsOpen && findOpen}
           onToggleResults={() => setResultsOpen((v) => !v)}
+          findScale={editorSettings.findScale}
+          onFindScale={(next) => setEditorSettings((s) => clampSettings({ ...s, findScale: next }))}
         />
       )}
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_SETTINGS, ZOOM_MAX, ZOOM_MIN, type EditorSettings } from "../lib/settings";
+import { DEFAULT_SETTINGS, UI_SCALE_MAX, UI_SCALE_MIN, ZOOM_MAX, ZOOM_MIN, type EditorSettings } from "../lib/settings";
 import {
   allThemes,
   isValidTheme,
@@ -97,8 +97,8 @@ export default function SettingsDialog({ value, onChange, onClose }: Props) {
 
         <div className="setting-row">
           <label>
-            缩放
-            <span className="dim">{value.zoom}%（最大 300%）</span>
+            正文字号缩放
+            <span className="dim">{value.zoom}%（最大 900px）</span>
           </label>
           <input
             type="range"
@@ -107,6 +107,36 @@ export default function SettingsDialog({ value, onChange, onClose }: Props) {
             step={5}
             value={value.zoom}
             onChange={(e) => set({ zoom: Number(e.target.value) })}
+          />
+        </div>
+
+        <div className="setting-row">
+          <label>
+            界面字号
+            <span className="dim">{value.uiScale}% · 菜单/侧栏/面板</span>
+          </label>
+          <input
+            type="range"
+            min={UI_SCALE_MIN}
+            max={UI_SCALE_MAX}
+            step={10}
+            value={value.uiScale}
+            onChange={(e) => set({ uiScale: Number(e.target.value) })}
+          />
+        </div>
+
+        <div className="setting-row">
+          <label>
+            查找框字号
+            <span className="dim">{value.findScale}%</span>
+          </label>
+          <input
+            type="range"
+            min={UI_SCALE_MIN}
+            max={UI_SCALE_MAX}
+            step={10}
+            value={value.findScale}
+            onChange={(e) => set({ findScale: Number(e.target.value) })}
           />
         </div>
 

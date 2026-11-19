@@ -1,14 +1,33 @@
-/* NotePP 全局样式 — 深色主题，对标 Notepad++ 体验 */
+/* NotePP 全局样式 — UI 主题变量由运行时注入到 :root，此处深色值仅作 fallback */
 :root {
-  --bg: #1e1f22;
-  --bg-panel: #25272b;
-  --bg-hover: #2f3136;
-  --bg-active: #34383f;
-  --border: #3a3d44;
-  --fg: #d7dae0;
-  --fg-dim: #8a8f98;
-  --accent: #4f9cf9;
-  --danger: #e06c75;
+  /* UI 主题色：切换主题时由运行时按主题覆盖 */
+  --ui-bg: #1e1f22;
+  --ui-panel: #25272b;
+  --ui-panel-2: #2a2d33;
+  --ui-hover: #2f3136;
+  --ui-active: #34383f;
+  --ui-border: #3a3d44;
+  --ui-fg: #d7dae0;
+  --ui-fg-dim: #8a8f98;
+  --ui-accent: #4f9cf9;
+  --ui-accent-soft: rgba(79, 156, 249, 0.16);
+  --ui-danger: #e06c75;
+  --ui-linebar: #4f9cf9;
+
+  /* 字号倍率：运行时可调 */
+  --ui-scale: 1;
+  --find-scale: 1;
+
+  /* 旧变量兼容别名：始终指向新变量，兼容尚未迁移的引用 */
+  --bg: var(--ui-bg);
+  --bg-panel: var(--ui-panel);
+  --bg-hover: var(--ui-hover);
+  --bg-active: var(--ui-active);
+  --border: var(--ui-border);
+  --fg: var(--ui-fg);
+  --fg-dim: var(--ui-fg-dim);
+  --accent: var(--ui-accent);
+  --danger: var(--ui-danger);
 }
 
 * {
@@ -25,9 +44,37 @@ body,
 
 body {
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
-  font-size: 13px;
-  background: var(--bg);
-  color: var(--fg);
+  font-size: calc(13px * var(--ui-scale, 1));
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 细滚动条：配色随主题，克制不抢眼 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--ui-border);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-fg-dim);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .app {
@@ -46,27 +93,27 @@ body {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-border);
   user-select: none;
 }
 
 .menubar button {
   background: none;
   border: none;
-  color: var(--fg);
+  color: var(--ui-fg);
   padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
 }
 
 .menubar button:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 .menubar button.rec-active {
-  color: var(--danger);
+  color: var(--ui-danger);
   font-weight: 600;
 }
 
@@ -76,9 +123,9 @@ body {
 }
 
 .recent-select {
-  background: var(--bg-panel);
-  color: var(--fg);
-  border: 1px solid var(--border);
+  background: var(--ui-panel);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
   padding: 3px 6px;
   max-width: 260px;
@@ -88,8 +135,8 @@ body {
 .tabbar {
   display: flex;
   align-items: stretch;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-border);
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -99,36 +146,36 @@ body {
   align-items: center;
   gap: 6px;
   padding: 6px 8px 6px 12px;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   cursor: pointer;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--ui-border);
   white-space: nowrap;
   user-select: none;
 }
 
 .tab:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 .tab.active {
-  background: var(--bg);
-  color: var(--fg);
-  box-shadow: inset 0 2px 0 var(--accent);
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  box-shadow: inset 0 2px 0 var(--ui-accent);
 }
 
 .tab-dot {
   width: 10px;
   height: 10px;
-  font-size: 9px;
+  font-size: calc(9px * var(--ui-scale, 1));
   line-height: 10px;
-  color: var(--accent);
+  color: var(--ui-accent);
 }
 
 .tab-close {
   background: none;
   border: none;
-  color: var(--fg-dim);
-  font-size: 14px;
+  color: var(--ui-fg-dim);
+  font-size: calc(14px * var(--ui-scale, 1));
   width: 18px;
   height: 18px;
   line-height: 18px;
@@ -138,8 +185,8 @@ body {
 }
 
 .tab-close:hover {
-  background: var(--bg-active);
-  color: var(--fg);
+  background: var(--ui-active);
+  color: var(--ui-fg);
 }
 
 /* 编辑区 */
@@ -172,15 +219,15 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   user-select: none;
 }
 
 .empty-state h1 {
-  font-size: 42px;
+  font-size: calc(42px * var(--ui-scale, 1));
   margin: 0 0 8px;
   letter-spacing: 2px;
-  color: var(--fg);
+  color: var(--ui-fg);
 }
 
 .empty-state ul {
@@ -196,10 +243,10 @@ body {
   align-items: center;
   gap: 14px;
   padding: 3px 10px;
-  background: var(--bg-panel);
-  border-top: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--fg-dim);
+  background: var(--ui-panel);
+  border-top: 1px solid var(--ui-border);
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   user-select: none;
 }
 
@@ -208,7 +255,7 @@ body {
 }
 
 .status-item.clickable:hover {
-  color: var(--fg);
+  color: var(--ui-fg);
 }
 
 /* 弹窗 */
@@ -223,15 +270,15 @@ body {
 }
 
 .modal {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
   padding: 20px 24px;
   min-width: 340px;
   max-width: min(92vw, 560px);
   max-height: 88vh;
   overflow-y: auto;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.14);
 }
 
 .modal-actions {
@@ -244,15 +291,15 @@ body {
 .modal-actions button {
   padding: 6px 16px;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--fg);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
   cursor: pointer;
 }
 
 .modal-actions button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
   color: #fff;
 }
 
@@ -261,12 +308,12 @@ body {
   display: none;
   position: fixed;
   z-index: 150;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
   padding: 4px;
   min-width: 120px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24), 0 1px 4px rgba(0, 0, 0, 0.14);
 }
 
 .context-menu button {
@@ -275,14 +322,14 @@ body {
   text-align: left;
   background: none;
   border: none;
-  color: var(--fg);
+  color: var(--ui-fg);
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
 }
 
 .context-menu button:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 /* 文件对比视图 */
@@ -297,26 +344,26 @@ body {
   align-items: center;
   gap: 12px;
   padding: 6px 12px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-border);
   user-select: none;
 }
 
 .diff-title {
-  color: var(--fg);
+  color: var(--ui-fg);
 }
 
 .diff-close {
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  color: var(--fg);
+  background: var(--ui-hover);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-fg);
   border-radius: 4px;
   padding: 3px 12px;
   cursor: pointer;
 }
 
 .diff-close:hover {
-  background: var(--bg-active);
+  background: var(--ui-active);
 }
 
 .diff-host {
@@ -355,8 +402,8 @@ body {
 
 .diff-col {
   flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
   padding: 8px 10px;
   max-height: 300px;
@@ -365,7 +412,7 @@ body {
 
 .diff-col-title {
   font-weight: 600;
-  color: var(--accent);
+  color: var(--ui-accent);
   margin-bottom: 6px;
 }
 
@@ -376,44 +423,44 @@ body {
   padding: 4px 6px;
   border-radius: 4px;
   cursor: pointer;
-  color: var(--fg);
+  color: var(--ui-fg);
 }
 
 .diff-option:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 .diff-hint {
-  color: var(--fg-dim);
-  font-size: 12px;
+  color: var(--ui-fg-dim);
+  font-size: calc(12px * var(--ui-scale, 1));
   padding: 4px 6px;
 }
 
 .diff-arrow {
   align-self: center;
-  color: var(--fg-dim);
-  font-size: 20px;
+  color: var(--ui-fg-dim);
+  font-size: calc(20px * var(--ui-scale, 1));
 }
 
 /* CodeMirror 搜索面板深色适配 */.cm-panels {
-  background: var(--bg-panel) !important;
-  color: var(--fg);
-  border-color: var(--border) !important;
+  background: var(--ui-panel) !important;
+  color: var(--ui-fg);
+  border-color: var(--ui-border) !important;
 }
 
 .cm-panel.cm-search input,
 .cm-panel.cm-search button {
-  background: var(--bg-hover);
-  color: var(--fg);
-  border: 1px solid var(--border);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
   padding: 2px 6px;
 }
 
 .cm-textfield {
-  background: var(--bg-hover);
-  color: var(--fg);
-  border: 1px solid var(--border) !important;
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border) !important;
 }
 
 /* ---------- 三栏工作区（分类侧栏 + 文件列表 + 编辑器） ---------- */
@@ -431,16 +478,16 @@ body {
 }
 
 .menubar button.on {
-  background: var(--bg-active);
-  color: #fff;
+  background: var(--ui-active);
+  color: var(--ui-fg);
 }
 
 /* 左侧分类栏（宽度由布局状态注入 --sidebar-w，可拖拽调整） */
 .sidebar {
   width: var(--sidebar-w, 190px);
   flex: 0 0 var(--sidebar-w, 190px);
-  background: #232529;
-  border-right: 1px solid var(--border);
+  background: var(--ui-panel);
+  border-right: 1px solid var(--ui-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -455,28 +502,28 @@ body {
 }
 
 .sidebar-title {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   letter-spacing: 0.6px;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   font-weight: 600;
 }
 
 .icon-btn {
   background: none;
   border: none;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   cursor: pointer;
   border-radius: 4px;
   width: 20px;
   height: 20px;
   line-height: 1;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale, 1));
   flex: 0 0 auto;
 }
 
 .icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--fg);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
 }
 
 .sidebar-section {
@@ -498,29 +545,29 @@ body {
   width: 100%;
   background: none;
   border: none;
-  color: var(--fg);
+  color: var(--ui-fg);
   padding: 5px 8px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
   text-align: left;
   font-family: inherit;
 }
 
 .side-item:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 .side-item.active {
-  background: var(--bg-active);
-  color: #fff;
+  background: var(--ui-active);
+  color: var(--ui-fg);
 }
 
 .side-icon {
   width: 14px;
   text-align: center;
-  color: var(--accent);
-  font-size: 11px;
+  color: var(--ui-accent);
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 .side-label-text {
@@ -531,20 +578,20 @@ body {
 }
 
 .side-count {
-  color: var(--fg-dim);
-  font-size: 11px;
+  color: var(--ui-fg-dim);
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 .side-item.active .side-count {
-  color: var(--fg);
+  color: var(--ui-fg);
 }
 
 .side-del {
   opacity: 0;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   padding: 0 3px;
   border-radius: 3px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
   line-height: 1;
 }
 
@@ -554,18 +601,19 @@ body {
 
 .side-del:hover {
   background: rgba(224, 108, 117, 0.22);
-  color: var(--danger);
+  background: color-mix(in srgb, var(--ui-danger) 18%, transparent);
+  color: var(--ui-danger);
 }
 
 .side-group-title {
-  font-size: 11px;
-  color: var(--fg-dim);
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   padding: 8px 8px 4px;
 }
 
 .side-hint {
-  font-size: 11px;
-  color: #5f646c;
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   line-height: 1.7;
   padding: 2px 8px 6px;
   margin: 0;
@@ -588,12 +636,12 @@ body {
 .side-input {
   flex: 1;
   min-width: 0;
-  background: var(--bg);
-  border: 1px solid var(--accent);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-accent);
   border-radius: 4px;
-  color: var(--fg);
+  color: var(--ui-fg);
   padding: 3px 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   outline: none;
   font-family: inherit;
 }
@@ -602,34 +650,35 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: var(--fg-dim);
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   padding: 4px 8px;
   flex-wrap: wrap;
 }
 
 .mini {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
   border: none;
-  color: var(--fg);
+  color: var(--ui-fg);
   border-radius: 4px;
   padding: 2px 7px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   cursor: pointer;
   font-family: inherit;
 }
 
 .mini.danger {
   background: rgba(224, 108, 117, 0.18);
-  color: #f0a2a8;
+  background: color-mix(in srgb, var(--ui-danger) 15%, transparent);
+  color: var(--ui-danger);
 }
 
 /* 中间文件列表（宽度由布局状态注入 --filelist-w，可拖拽调整） */
 .filelist {
   width: var(--filelist-w, 264px);
   flex: 0 0 var(--filelist-w, 264px);
-  background: #212327;
-  border-right: 1px solid var(--border);
+  background: var(--ui-panel);
+  border-right: 1px solid var(--ui-border);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -646,7 +695,7 @@ body {
 
 .splitter:hover,
 .splitter[data-dragging="true"] {
-  background: var(--accent, #4c8dff);
+  background: var(--ui-accent, #4c8dff);
 }
 
 body.resizing {
@@ -663,7 +712,7 @@ body.resizing {
 
 .filelist-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -671,8 +720,8 @@ body.resizing {
 }
 
 .filelist-count {
-  color: var(--fg-dim);
-  font-size: 11px;
+  color: var(--ui-fg-dim);
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 .filelist-search {
@@ -682,18 +731,18 @@ body.resizing {
 
 .filelist-search input {
   width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
-  color: var(--fg);
+  color: var(--ui-fg);
   padding: 5px 24px 5px 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   outline: none;
   font-family: inherit;
 }
 
 .filelist-search input:focus {
-  border-color: var(--accent);
+  border-color: var(--ui-accent);
 }
 
 .search-clear {
@@ -702,9 +751,9 @@ body.resizing {
   top: 3px;
   background: none;
   border: none;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale, 1));
 }
 
 .filelist-body {
@@ -723,12 +772,12 @@ body.resizing {
 }
 
 .file-row:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 .file-row.active {
-  background: var(--bg-active);
-  border-color: #3f4650;
+  background: var(--ui-active);
+  border-color: var(--ui-border);
 }
 
 .file-row-line {
@@ -739,7 +788,7 @@ body.resizing {
 }
 
 .file-name {
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -748,8 +797,8 @@ body.resizing {
 }
 
 .file-time {
-  font-size: 11px;
-  color: var(--fg-dim);
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   flex: 0 0 auto;
 }
 
@@ -758,8 +807,8 @@ body.resizing {
 }
 
 .file-preview {
-  font-size: 11.5px;
-  color: var(--fg-dim);
+  font-size: calc(11.5px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -767,8 +816,8 @@ body.resizing {
 }
 
 .file-path {
-  font-size: 10.5px;
-  color: #61666e;
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -778,7 +827,7 @@ body.resizing {
 
 .file-star {
   color: #f2c14e;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 .row-star {
@@ -787,9 +836,9 @@ body.resizing {
   bottom: 7px;
   background: none;
   border: none;
-  color: #61666e;
+  color: var(--ui-fg-dim);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   opacity: 0;
   padding: 0 2px;
 }
@@ -806,8 +855,8 @@ body.resizing {
 .filelist-empty {
   text-align: center;
   padding: 44px 12px;
-  color: var(--fg-dim);
-  font-size: 12px;
+  color: var(--ui-fg-dim);
+  font-size: calc(12px * var(--ui-scale, 1));
 }
 
 .filelist-empty p {
@@ -815,8 +864,8 @@ body.resizing {
 }
 
 .filelist-empty .dim {
-  color: #5f646c;
-  font-size: 11px;
+  color: var(--ui-fg-dim);
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 /* 右键分类菜单 */
@@ -824,16 +873,16 @@ body.resizing {
   position: fixed;
   z-index: 60;
   min-width: 172px;
-  background: #2b2e33;
-  border: 1px solid var(--border);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
   padding: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.26), 0 2px 8px rgba(0, 0, 0, 0.14);
 }
 
 .ctx-title {
-  font-size: 10.5px;
-  color: var(--fg-dim);
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   padding: 4px 8px 2px;
 }
 
@@ -844,32 +893,32 @@ body.resizing {
   width: 100%;
   background: none;
   border: none;
-  color: var(--fg);
+  color: var(--ui-fg);
   padding: 5px 8px;
   border-radius: 5px;
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-scale, 1));
   text-align: left;
   font-family: inherit;
 }
 
 .ctx-item:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 .ctx-item.danger {
-  color: #f0a2a8;
+  color: var(--ui-danger);
 }
 
 .ctx-check {
   margin-left: auto;
-  color: var(--accent);
-  font-size: 11px;
+  color: var(--ui-accent);
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 .ctx-sep {
   height: 1px;
-  background: var(--border);
+  background: var(--ui-border);
   margin: 4px 2px;
 }
 
@@ -882,7 +931,7 @@ body.resizing {
 
 .modal.settings h3 {
   margin: 0 0 14px;
-  font-size: 15px;
+  font-size: calc(15px * var(--ui-scale, 1));
 }
 
 .setting-row {
@@ -897,38 +946,38 @@ body.resizing {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
 }
 
 .setting-row .dim {
-  color: var(--fg-dim);
-  font-size: 11px;
+  color: var(--ui-fg-dim);
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 .setting-row input[type="range"] {
   width: 180px;
-  accent-color: var(--accent);
+  accent-color: var(--ui-accent);
 }
 
 .setting-row select,
 .setting-row input[type="checkbox"] {
-  accent-color: var(--accent);
+  accent-color: var(--ui-accent);
 }
 
 .setting-row select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--fg);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-fg);
   border-radius: 5px;
   padding: 4px 8px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-scale, 1));
   outline: none;
   font-family: inherit;
 }
 
 /* ---------- 文件夹树 ---------- */
 .folder-section {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--ui-border);
   padding-top: 4px;
 }
 
@@ -946,30 +995,30 @@ body.resizing {
 .tree-item {
   padding-top: 3px;
   padding-bottom: 3px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-scale, 1));
 }
 
 .tree-caret {
   width: 10px;
   flex: 0 0 10px;
-  color: var(--fg-dim);
-  font-size: 10px;
+  color: var(--ui-fg-dim);
+  font-size: calc(10px * var(--ui-scale, 1));
 }
 
 .tree-icon {
   width: 16px;
   flex: 0 0 16px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
 }
 
 .tree-loading {
-  font-size: 11px;
-  color: #5f646c;
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   padding: 3px 8px;
 }
 
 .danger-text {
-  color: #f0a2a8 !important;
+  color: var(--ui-danger) !important;
 }
 
 /* ---------- AI：右键菜单 ---------- */
@@ -977,11 +1026,11 @@ body.resizing {
   position: fixed;
   z-index: 160;
   min-width: 190px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
   padding: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.26), 0 2px 8px rgba(0, 0, 0, 0.14);
 }
 
 .ai-menu-head {
@@ -990,10 +1039,10 @@ body.resizing {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   letter-spacing: 0.04em;
-  color: var(--fg-dim);
-  border-bottom: 1px solid var(--border);
+  color: var(--ui-fg-dim);
+  border-bottom: 1px solid var(--ui-border);
   margin-bottom: 4px;
 }
 
@@ -1009,13 +1058,13 @@ body.resizing {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--fg);
-  font-size: 13px;
+  color: var(--ui-fg);
+  font-size: calc(13px * var(--ui-scale, 1));
   cursor: pointer;
 }
 
 .ai-menu button:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 
 .ai-menu button:disabled {
@@ -1024,7 +1073,7 @@ body.resizing {
 }
 
 .ai-menu .ai-menu-config {
-  color: var(--accent);
+  color: var(--ui-accent);
 }
 
 /* ---------- AI：弹窗 ---------- */
@@ -1038,7 +1087,7 @@ body.resizing {
 
 .modal-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--ui-scale, 1));
   font-weight: 600;
 }
 
@@ -1054,15 +1103,15 @@ body.resizing {
   gap: 8px;
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--ui-border);
 }
 
 .modal-foot button {
   padding: 6px 14px;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--fg);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
   cursor: pointer;
 }
 
@@ -1072,8 +1121,8 @@ body.resizing {
 }
 
 .modal-foot button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
   color: #fff;
 }
 
@@ -1100,29 +1149,29 @@ body.resizing {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
-  color: var(--fg-dim);
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
 }
 
 .field > span {
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
 }
 
 .field input,
 .field select {
   padding: 6px 8px;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-input, #1b1d21);
-  color: var(--fg);
-  font-size: 13px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-panel-2, #1b1d21);
+  color: var(--ui-fg);
+  font-size: calc(13px * var(--ui-scale, 1));
   font-family: inherit;
 }
 
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--ui-accent);
 }
 
 .row-actions {
@@ -1134,10 +1183,10 @@ body.resizing {
 .row-actions button {
   padding: 5px 10px;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--fg);
-  font-size: 12px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  font-size: calc(12px * var(--ui-scale, 1));
   cursor: pointer;
 }
 
@@ -1148,8 +1197,8 @@ body.resizing {
 
 .hint {
   margin: 0;
-  font-size: 12px;
-  color: var(--fg-dim);
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
   line-height: 1.6;
 }
 
@@ -1159,7 +1208,7 @@ body.resizing {
 
 .msg {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   line-height: 1.6;
 }
 
@@ -1172,8 +1221,8 @@ body.resizing {
 }
 
 .status-dot {
-  font-size: 12px;
-  color: var(--fg-dim);
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
 }
 
 .status-dot.ok {
@@ -1181,11 +1230,11 @@ body.resizing {
 }
 
 .ai-source {
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
   padding: 6px 8px;
-  font-size: 12px;
-  color: var(--fg-dim);
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
 }
 
 .ai-source summary {
@@ -1199,7 +1248,7 @@ body.resizing {
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 12px;
-  color: var(--fg);
+  color: var(--ui-fg);
   opacity: 0.9;
 }
 
@@ -1209,9 +1258,9 @@ body.resizing {
   resize: vertical;
   padding: 10px;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-input, #1b1d21);
-  color: var(--fg);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-panel-2, #1b1d21);
+  color: var(--ui-fg);
   font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace);
   font-size: 13px;
   line-height: 1.6;
@@ -1219,7 +1268,7 @@ body.resizing {
 
 .ai-output:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--ui-accent);
 }
 
 .ai-loading {
@@ -1227,16 +1276,16 @@ body.resizing {
   align-items: center;
   gap: 8px;
   padding: 24px 0;
-  font-size: 13px;
-  color: var(--fg-dim);
+  font-size: calc(13px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
 }
 
 .spinner {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
+  border: 2px solid var(--ui-border);
+  border-top-color: var(--ui-accent);
   animation: spin 0.8s linear infinite;
 }
 
@@ -1250,9 +1299,9 @@ button.link {
   margin-left: 8px;
   border: none;
   background: transparent;
-  color: var(--accent);
+  color: var(--ui-accent);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   text-decoration: underline;
 }
 
@@ -1263,24 +1312,24 @@ button.link {
   gap: 10px;
   padding: 6px 12px;
   background: rgba(217, 164, 65, 0.12);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: calc(12px * var(--ui-scale, 1));
   color: var(--warn, #d9a441);
 }
 
 .large-banner button {
   padding: 3px 10px;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--fg);
-  font-size: 12px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  font-size: calc(12px * var(--ui-scale, 1));
   cursor: pointer;
 }
 
 .large-banner .hint {
   margin-left: auto;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
 }
 
 .modal.update-dialog {
@@ -1290,7 +1339,7 @@ button.link {
 
 .modal.update-dialog code {
   font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   opacity: 0.9;
 }
 
@@ -1354,14 +1403,14 @@ button.link {
   background: none;
   border: none;
   color: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
   cursor: pointer;
 }
 .ai-menu .ann-menu-item:hover {
-  background: rgba(128, 128, 128, 0.18);
+  background: var(--ui-hover);
 }
 .ai-menu .ann-remove {
-  color: #e5534b;
+  color: var(--ui-danger);
 }
 
 /* 标注信息输入浮层 */
@@ -1369,22 +1418,22 @@ button.link {
   position: fixed;
   z-index: 1000;
   width: 300px;
-  background: var(--bg-panel, #21252b);
-  border: 1px solid var(--border);
+  background: var(--ui-panel, #21252b);
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
   padding: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.26), 0 2px 8px rgba(0, 0, 0, 0.14);
 }
 .note-input-pop textarea {
   width: 100%;
   min-height: 80px;
   resize: vertical;
-  background: var(--bg, #1b1d22);
-  color: var(--fg);
-  border: 1px solid var(--border);
+  background: var(--ui-bg, #1b1d22);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
   padding: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
   box-sizing: border-box;
 }
 .note-input-actions {
@@ -1405,15 +1454,15 @@ button.link {
   position: relative;
   padding: 12px 8px 8px;
   border-radius: 8px;
-  border: 2px solid var(--border);
+  border: 2px solid var(--ui-border);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   text-align: left;
   overflow: hidden;
 }
 .theme-swatch.on {
-  border-color: var(--accent, #4f8cff);
-  box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.35);
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 35%, transparent);
 }
 .theme-swatch .theme-swatch-a,
 .theme-swatch .theme-swatch-p {
@@ -1434,16 +1483,16 @@ button.link {
 }
 .theme-ops button {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--fg);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
   cursor: pointer;
 }
 .theme-msg {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   width: 100%;
 }
 
@@ -1507,9 +1556,9 @@ button.link {
 }
 .table-rows-cols input {
   width: 70px;
-  background: var(--bg, #1b1d22);
-  color: var(--fg);
-  border: 1px solid var(--border);
+  background: var(--ui-bg, #1b1d22);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
   padding: 4px 8px;
 }
@@ -1518,9 +1567,9 @@ button.link {
 
 .findbar {
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  background: var(--bg-panel, #21252b);
-  font-size: 12.5px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-panel, #21252b);
+  font-size: calc(12.5px * var(--find-scale, 1) * var(--ui-scale, 1));
   max-height: 46vh;
   display: flex;
   flex-direction: column;
@@ -1536,25 +1585,25 @@ button.link {
   border: 1px solid transparent;
   border-radius: 5px 5px 0 0;
   background: none;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--find-scale, 1) * var(--ui-scale, 1));
 }
 .findbar-tabs button.on {
-  background: var(--bg, #1b1d22);
-  border-color: var(--border);
+  background: var(--ui-bg, #1b1d22);
+  border-color: var(--ui-border);
   border-bottom-color: transparent;
-  color: var(--fg);
+  color: var(--ui-fg);
 }
 .findbar-tabs button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 .findbar-close {
-  font-size: 16px;
+  font-size: calc(16px * var(--find-scale, 1) * var(--ui-scale, 1));
   line-height: 1;
   padding: 0 6px !important;
-  color: var(--fg-dim) !important;
+  color: var(--ui-fg-dim) !important;
 }
 .findbar-rows {
   padding: 6px 8px;
@@ -1569,38 +1618,38 @@ button.link {
 }
 .findbar-label {
   width: 34px;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--find-scale, 1) * var(--ui-scale, 1));
 }
 .findbar-input {
   flex: 1;
   min-width: 120px;
-  background: var(--bg, #1b1d22);
-  color: var(--fg);
-  border: 1px solid var(--border);
+  background: var(--ui-bg, #1b1d22);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
   border-radius: 5px;
   padding: 4px 8px;
   font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--find-scale, 1) * var(--ui-scale, 1));
   outline: none;
 }
 .findbar-input:focus {
-  border-color: var(--accent, #4f8cff);
+  border-color: var(--ui-accent, #4f8cff);
 }
 .findbar-input.bad,
 .findbar-input.empty {
-  border-color: #e5534b;
+  border-color: var(--ui-danger);
 }
 .findbar-count {
   min-width: 62px;
   text-align: right;
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   font-variant-numeric: tabular-nums;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--find-scale, 1) * var(--ui-scale, 1));
 }
 .findbar-count.bad {
-  color: #e5534b;
+  color: var(--ui-danger);
 }
 .findbar-toggles {
   display: flex;
@@ -1609,33 +1658,33 @@ button.link {
 .findbar-toggles button {
   width: 26px;
   height: 24px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
-  background: var(--bg, #1b1d22);
-  color: var(--fg-dim);
+  background: var(--ui-bg, #1b1d22);
+  color: var(--ui-fg-dim);
   cursor: pointer;
-  font-size: 11px;
+  font-size: calc(11px * var(--find-scale, 1) * var(--ui-scale, 1));
   font-family: var(--mono, monospace);
   padding: 0;
 }
 .findbar-toggles button.on {
-  background: var(--accent, #4f8cff);
-  border-color: var(--accent, #4f8cff);
+  background: var(--ui-accent, #4f8cff);
+  border-color: var(--ui-accent, #4f8cff);
   color: #fff;
 }
 .findbar-btn {
   min-width: 26px;
   height: 24px;
   padding: 0 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
-  background: var(--bg-hover, #2c313a);
-  color: var(--fg);
+  background: var(--ui-hover, #2c313a);
+  color: var(--ui-fg);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--find-scale, 1) * var(--ui-scale, 1));
 }
 .findbar-btn:hover:not(:disabled) {
-  border-color: var(--accent, #4f8cff);
+  border-color: var(--ui-accent, #4f8cff);
 }
 .findbar-btn:disabled {
   opacity: 0.45;
@@ -1647,24 +1696,24 @@ button.link {
 .findbar-results {
   overflow: auto;
   padding: 0 8px 8px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--ui-border);
 }
 .findbar-results-head {
   padding: 6px 2px;
-  color: var(--fg-dim);
-  font-size: 11.5px;
+  color: var(--ui-fg-dim);
+  font-size: calc(11.5px * var(--find-scale, 1) * var(--ui-scale, 1));
   position: sticky;
   top: 0;
-  background: var(--bg-panel, #21252b);
+  background: var(--ui-panel, #21252b);
 }
 .findbar-group {
   margin-bottom: 6px;
 }
 .findbar-group-head {
   padding: 4px 6px;
-  background: var(--bg-hover, #2c313a);
+  background: var(--ui-hover, #2c313a);
   border-radius: 4px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--find-scale, 1) * var(--ui-scale, 1));
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1678,18 +1727,18 @@ button.link {
   padding: 2px 6px 2px 16px;
   border: none;
   background: none;
-  color: var(--fg);
+  color: var(--ui-fg);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--find-scale, 1) * var(--ui-scale, 1));
   font-family: var(--mono, monospace);
   white-space: nowrap;
   overflow: hidden;
 }
 .findbar-hit:hover {
-  background: rgba(79, 140, 255, 0.16);
+  background: var(--ui-accent-soft);
 }
 .findbar-hit-line {
-  color: var(--fg-dim);
+  color: var(--ui-fg-dim);
   min-width: 36px;
   text-align: right;
   flex-shrink: 0;
@@ -1722,7 +1771,7 @@ button.link {
   background: rgba(46, 160, 67, 0.16);
   border: 1px solid rgba(46, 160, 67, 0.45);
   color: #2ea043;
-  font-size: 12px;
+  font-size: calc(12px * var(--find-scale, 1) * var(--ui-scale, 1));
 }
 
 /* ================= v0.10 移动端（Android / 窄屏） ================= */
@@ -1741,7 +1790,7 @@ button.link {
   .menubar button {
     flex-shrink: 0;
     padding: 6px 8px;
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-scale, 1));
   }
   .menubar .recent-select {
     display: none;
@@ -1777,7 +1826,7 @@ button.link {
 
   /* 大文件横幅、状态栏压缩 */
   .statusbar {
-    font-size: 11px;
+    font-size: calc(11px * var(--ui-scale, 1));
     gap: 8px;
     overflow-x: auto;
   }
@@ -1805,7 +1854,7 @@ button.link {
   }
   .ai-menu button {
     padding: 9px 12px;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-scale, 1));
   }
 
   .modal {
@@ -1844,21 +1893,21 @@ button.link {
 
 /* ===== v0.11 搜索结果面板 ===== */
 .search-results {
-  border-top: 1px solid var(--border, #333);
+  border-top: 1px solid var(--ui-border, #333);
   display: flex;
   flex-direction: column;
   height: 180px;
   min-height: 90px;
-  background: var(--bg, #1e1e1e);
+  background: var(--ui-bg, #1e1e1e);
 }
 .search-results-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
-  font-size: 12px;
-  border-bottom: 1px solid var(--border, #333);
-  color: var(--fg, #ddd);
+  font-size: calc(12px * var(--ui-scale, 1));
+  border-bottom: 1px solid var(--ui-border, #333);
+  color: var(--ui-fg, #ddd);
 }
 .search-results-title {
   overflow: hidden;
@@ -1871,22 +1920,22 @@ button.link {
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   padding: 2px 8px;
   border-radius: 4px;
 }
 .search-results-btn:hover {
-  background: var(--para, #2a2a2a);
+  background: var(--ui-hover, #2a2a2a);
 }
 .search-results-list {
   flex: 1;
   overflow-y: auto;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   line-height: 1.6;
 }
 .search-results-empty {
   padding: 12px;
-  color: var(--fg, #999);
+  color: var(--ui-fg, #999);
   opacity: 0.7;
 }
 .search-results-hit {
@@ -1895,23 +1944,23 @@ button.link {
   text-align: left;
   background: none;
   border: none;
-  color: var(--fg, #ddd);
+  color: var(--ui-fg, #ddd);
   cursor: pointer;
   padding: 1px 10px;
   gap: 8px;
   font: inherit;
 }
 .search-results-hit:hover {
-  background: var(--para, #2a2a2a);
+  background: var(--ui-hover, #2a2a2a);
 }
 .search-results-hit.cur {
-  background: var(--para, #2a2a2a);
-  box-shadow: inset 2px 0 0 var(--accent, #4a9eff);
+  background: var(--ui-hover, #2a2a2a);
+  box-shadow: inset 2px 0 0 var(--ui-accent, #4a9eff);
 }
 .search-results-line {
   flex: 0 0 3.2em;
   text-align: right;
-  color: var(--fg, #888);
+  color: var(--ui-fg, #888);
   opacity: 0.75;
   font-variant-numeric: tabular-nums;
 }
@@ -1940,7 +1989,7 @@ button.link {
   min-width: 0;
 }
 .editor-split {
-  border-left: 1px solid var(--border, #333);
+  border-left: 1px solid var(--ui-border, #333);
   display: flex;
   flex-direction: column;
 }
@@ -1949,16 +1998,16 @@ button.link {
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
-  border-bottom: 1px solid var(--border, #333);
+  border-bottom: 1px solid var(--ui-border, #333);
 }
 .editor-split-head select {
   flex: 1;
   min-width: 0;
-  background: var(--bg, #1e1e1e);
-  color: var(--fg, #ddd);
-  border: 1px solid var(--border, #444);
+  background: var(--ui-bg, #1e1e1e);
+  color: var(--ui-fg, #ddd);
+  border: 1px solid var(--ui-border, #444);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   padding: 2px 6px;
 }
 .editor-split-head button {
@@ -1966,12 +2015,12 @@ button.link {
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale, 1));
   padding: 0 6px;
   border-radius: 4px;
 }
 .editor-split-head button:hover {
-  background: var(--para, #2a2a2a);
+  background: var(--ui-hover, #2a2a2a);
 }
 @media (max-width: 820px) {
   .editor-split {
@@ -1981,39 +2030,39 @@ button.link {
 
 /* ===== v0.11 标注导航面板 ===== */
 .anno-panel {
-  border-top: 1px solid var(--border, #333);
+  border-top: 1px solid var(--ui-border, #333);
   display: flex;
   flex-direction: column;
   height: 160px;
   min-height: 80px;
-  background: var(--bg, #1e1e1e);
+  background: var(--ui-bg, #1e1e1e);
 }
 .anno-panel-head {
   display: flex;
   align-items: center;
   padding: 4px 10px;
-  font-size: 12px;
-  border-bottom: 1px solid var(--border, #333);
-  color: var(--fg, #ddd);
+  font-size: calc(12px * var(--ui-scale, 1));
+  border-bottom: 1px solid var(--ui-border, #333);
+  color: var(--ui-fg, #ddd);
 }
 .anno-panel-btn {
   background: none;
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   padding: 2px 8px;
   border-radius: 4px;
 }
-.anno-panel-btn:hover { background: var(--para, #2a2a2a); }
+.anno-panel-btn:hover { background: var(--ui-hover, #2a2a2a); }
 .anno-panel-list {
   flex: 1;
   overflow-y: auto;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
 }
 .anno-panel-empty {
   padding: 12px;
-  color: var(--fg, #999);
+  color: var(--ui-fg, #999);
   opacity: 0.7;
 }
 .anno-item {
@@ -2027,20 +2076,20 @@ button.link {
   gap: 8px;
   background: none;
   border: none;
-  color: var(--fg, #ddd);
+  color: var(--ui-fg, #ddd);
   cursor: pointer;
   padding: 3px 10px;
   font: inherit;
   text-align: left;
   min-width: 0;
 }
-.anno-item-main:hover { background: var(--para, #2a2a2a); }
+.anno-item-main:hover { background: var(--ui-hover, #2a2a2a); }
 .anno-item-kind {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   padding: 0 6px;
   border-radius: 8px;
-  border: 1px solid var(--border, #555);
+  border: 1px solid var(--ui-border, #555);
 }
 .anno-item-kind.kind-highlight { border-color: rgba(255, 200, 0, 0.7); }
 .anno-item-kind.kind-underline { border-color: rgba(80, 160, 255, 0.7); }
@@ -2069,30 +2118,30 @@ button.link {
   cursor: pointer;
   padding: 0 10px;
 }
-.anno-item-del:hover { opacity: 1; background: var(--para, #2a2a2a); }
+.anno-item-del:hover { opacity: 1; background: var(--ui-hover, #2a2a2a); }
 
 /* ===== v0.11.1 对比视图：模式切换 + 渲染预览 ===== */
 .diff-modes {
   display: flex;
   gap: 2px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 5px;
   overflow: hidden;
 }
 .diff-modes button {
   background: none;
   border: none;
-  color: var(--fg-dim, #999);
+  color: var(--ui-fg-dim, #999);
   padding: 3px 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   cursor: pointer;
 }
 .diff-modes button:hover {
-  background: var(--bg-hover);
+  background: var(--ui-hover);
 }
 .diff-modes button.on {
-  background: var(--bg-active);
-  color: #fff;
+  background: var(--ui-active);
+  color: var(--ui-fg);
 }
 .diff-preview {
   flex: 1;
@@ -2105,7 +2154,7 @@ button.link {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--ui-border);
   overflow: hidden;
 }
 .diff-preview-pane:last-child {
@@ -2114,10 +2163,10 @@ button.link {
 .diff-preview-head {
   flex: 0 0 auto;
   padding: 4px 12px;
-  font-size: 12px;
-  color: var(--fg-dim, #999);
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim, #999);
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-border);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2137,7 +2186,7 @@ button.link {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--fg);
+  color: var(--ui-fg);
 }
 
 /* ===== v0.11.6 查找浮窗（可拖动，与编辑区并存；底部结果面板不变） ===== */
@@ -2146,27 +2195,142 @@ button.link {
   z-index: 150;
   width: min(620px, calc(100vw - 24px));
   max-height: 62vh;
-  border: 1px solid var(--border, #444);
+  border: 1px solid var(--ui-border, #444);
   border-radius: 8px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
-  background: var(--bg-panel, #21252b);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.30), 0 2px 10px rgba(0, 0, 0, 0.16);
+  background: var(--ui-panel, #21252b);
 }
 .findbar-tabs {
   cursor: move;
   user-select: none;
   touch-action: none;
-  border-bottom: 1px solid var(--border, #333);
+  border-bottom: 1px solid var(--ui-border, #333);
   padding-left: 4px;
 }
 .findbar-tabs button {
   cursor: pointer;
 }
 .findbar-drag {
-  color: var(--fg-dim, #888);
-  font-size: 14px;
+  color: var(--ui-fg-dim, #888);
+  font-size: calc(14px * var(--find-scale, 1) * var(--ui-scale, 1));
   padding: 0 4px;
   cursor: move;
 }
 .findbar-results {
   max-height: 30vh;
+}
+
+/* ===== 统一交互反馈：快速、克制的过渡与聚焦环 ===== */
+button,
+.tab,
+.tab-close,
+.icon-btn,
+.side-item,
+.side-del,
+.mini,
+.file-row,
+.row-star,
+.ctx-item,
+.diff-option,
+.theme-swatch,
+.field input,
+.field select,
+.setting-row select,
+.filelist-search input,
+.side-input,
+.findbar-hit,
+.search-results-hit,
+.anno-item-main,
+.anno-item-del,
+.editor-split-head select,
+.splitter {
+  transition: background-color 0.12s ease, color 0.12s ease,
+              border-color 0.12s ease, box-shadow 0.12s ease,
+              opacity 0.12s ease;
+}
+
+button:focus-visible,
+.tab:focus-visible,
+.side-item:focus-visible,
+.filelist-search input:focus,
+.side-input:focus,
+.findbar-input:focus,
+.field input:focus,
+.field select:focus,
+.setting-row select:focus,
+.editor-split-head select:focus {
+  outline: none;
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-accent-soft);
+}
+
+/* 查找框字号微调控件（A− / 百分比 / A+）——与 .findbar 其它元素同步缩放 */
+.findbar-fontctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.findbar-fontbtn {
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-bg, #1b1d22);
+  color: var(--ui-fg-dim);
+  cursor: pointer;
+  font-size: calc(11px * var(--find-scale, 1) * var(--ui-scale, 1));
+  font-family: var(--mono, monospace);
+  line-height: 1;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.findbar-fontbtn:hover {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  border-color: var(--ui-accent);
+}
+.findbar-fontbtn:active {
+  background: var(--ui-accent-soft, var(--ui-active));
+}
+.findbar-fontval {
+  min-width: 34px;
+  text-align: center;
+  color: var(--ui-fg-dim, var(--fg-dim, #8a8f98));
+  font-size: calc(10.5px * var(--find-scale, 1) * var(--ui-scale, 1));
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+/* 统一的交互过渡：仅颜色，克制 0.12s，保持各主题下层级反馈一致 */
+.menubar button,
+.tab,
+.tab-close,
+.icon-btn,
+.side-item,
+.side-del,
+.mini,
+.filelist-search input,
+.file-row,
+.row-star,
+.ctx-item,
+.setting-row select,
+.theme-ops button,
+.ai-menu button,
+.modal-actions button,
+.modal-foot button,
+.row-actions button,
+.field input,
+.field select,
+.findbar-tabs button,
+.findbar-toggles button,
+.findbar-btn,
+.findbar-hit,
+.findbar-fontbtn,
+.search-results-btn,
+.search-results-hit,
+.anno-panel-btn,
+.anno-item-main,
+.anno-item-del,
+.diff-modes button {
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }

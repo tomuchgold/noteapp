@@ -157,6 +157,70 @@ export function findTheme(id: string): ThemeDef {
   return allThemes().find((t) => t.id === id) ?? BUILTIN_THEMES[0];
 }
 
+/** hex → rgb 三元组 */
+function hexRgb(hex: string): [number, number, number] {
+  const m = hex.replace("#", "");
+  const v = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
+  const n = parseInt(v, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** 颜色混合：t=0 返回 a，t=1 返回 b */
+function mix(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = hexRgb(a);
+  const [br, bg, bb] = hexRgb(b);
+  const c = (x: number, y: number) => Math.round(x + (y - x) * t);
+  const h = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${h(c(ar, br))}${h(c(ag, bg))}${h(c(ab, bb))}`;
+}
+
+/** hex → rgba 字符串 */
+function rgba(hex: string, alpha: number): string {
+  const [r, g, b] = hexRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * 把主题配色映射为「整体界面」CSS 变量（菜单/侧栏/面板/按钮/查找框等）。
+ * 由 App 在运行时注入到 document.documentElement，使切换主题时整个界面跟随变化。
+ */
+export function themeUiVars(t: ThemeDef): Record<string, string> {
+  const c = t.colors;
+  const dark = t.dark;
+  // 面板底色：暗色主题向黑混合更深，亮色主题向白混合更浅，与编辑区形成层次
+  const panel = dark ? mix(c.bg, "#000000", 0.16) : mix(c.bg, "#000000", 0.04);
+  const panel2 = dark ? mix(c.bg, "#ffffff", 0.05) : mix(c.bg, "#000000", 0.02);
+  const hover = dark ? mix(c.bg, "#ffffff", 0.09) : mix(c.bg, "#000000", 0.07);
+  const active = dark ? mix(c.bg, "#ffffff", 0.15) : mix(c.bg, c.accent, 0.14);
+  const border = dark ? mix(c.bg, "#ffffff", 0.13) : mix(c.bg, "#000000", 0.14);
+  const danger = "#e5534b";
+  // 当前行左侧竖条：跟随 paraColor 由调用方覆盖，这里给主题强调色兜底
+  return {
+    "--ui-bg": c.bg,
+    "--ui-panel": panel,
+    "--ui-panel-2": panel2,
+    "--ui-hover": hover,
+    "--ui-active": active,
+    "--ui-border": border,
+    "--ui-fg": c.fg,
+    "--ui-fg-dim": c.gutterFg,
+    "--ui-accent": c.accent,
+    "--ui-accent-soft": rgba(c.accent, dark ? 0.18 : 0.14),
+    "--ui-danger": danger,
+    "--ui-linebar": c.accent,
+    // 兼容旧变量：整体界面也随主题变化
+    "--bg": c.bg,
+    "--bg-panel": panel,
+    "--bg-hover": hover,
+    "--bg-active": active,
+    "--border": border,
+    "--fg": c.fg,
+    "--fg-dim": c.gutterFg,
+    "--accent": c.accent,
+    "--danger": danger,
+  };
+}
+
 /** 导出模板：给用户一份可改的 JSON */
 export function themeTemplate(): string {
   return JSON.stringify(

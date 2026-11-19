@@ -36,12 +36,17 @@ export interface FindBarProps {
   /** 结果面板显隐与开关 */
   resultsOpen?: boolean;
   onToggleResults?: () => void;
+  /** 查找框字号倍率（百分比）与调节回调 */
+  findScale?: number;
+  onFindScale?: (next: number) => void;
 }
 
 type Tab = "file" | "folder" | "tabs";
 
 /** 浮窗位置持久化 */
 const POS_KEY = "notepp.find.pos";
+/** 拖出窗口外时至少保留的可抓取边角（px），保证总能拖回来 */
+const KEEP = 90;
 function loadPos(): { x: number; y: number } {
   try {
     const p = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
@@ -55,6 +60,7 @@ export default function FindBar(props: FindBarProps) {
     open, total, current, options, query, folderRoot, folderHits, folderLoading,
     folderMessage, tabHits, tabMessage, onQuery, onOptions, onStep, onReplace, onReplaceAll,
     onFolderSearch, onTabsSearch, onOpenHit, onClose, seed, replaceMessage, resultsOpen, onToggleResults,
+    findScale = 100, onFindScale,
   } = props;
 
   const [tab, setTab] = useState<Tab>("file");
@@ -73,8 +79,10 @@ export default function FindBar(props: FindBarProps) {
   const onDragMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
-    const x = Math.min(Math.max(4, e.clientX - d.dx), Math.max(4, window.innerWidth - 180));
-    const y = Math.min(Math.max(4, e.clientY - d.dy), Math.max(4, window.innerHeight - 48));
+    // 允许把浮窗拖出主窗口之外；仅保留 KEEP 大小的可抓取区域，避免彻底丢失。
+    // 桌面端（Tauri）窗口可超出视口显示，多显示器场景下可拖到副屏。
+    const x = Math.min(Math.max(KEEP - 620, e.clientX - d.dx), window.innerWidth - KEEP);
+    const y = Math.min(Math.max(KEEP - 60, e.clientY - d.dy), window.innerHeight - 40);
     posRef.current = { x, y };
     setPos(posRef.current);
   };
@@ -165,6 +173,21 @@ export default function FindBar(props: FindBarProps) {
           在文件夹中
         </button>
         <span className="spacer" />
+        {onFindScale && (
+          <span className="findbar-fontctl" title={`查找框字号 ${findScale}%（可拖标题栏移动，Ctrl+[ ] 调界面字号）`}>
+            <button
+              className="findbar-fontbtn"
+              onClick={() => onFindScale(Math.max(70, findScale - 10))}
+              title="缩小查找框字号"
+            >A−</button>
+            <span className="findbar-fontval">{findScale}%</span>
+            <button
+              className="findbar-fontbtn"
+              onClick={() => onFindScale(Math.min(200, findScale + 10))}
+              title="放大查找框字号"
+            >A+</button>
+          </span>
+        )}
         {onToggleResults && (
           <button
             className={`findbar-btn wide ${resultsOpen ? "on" : ""}`}
