@@ -50,7 +50,9 @@ check("设置弹窗打开", (await page.locator(".modal").count()) === 1);
 const dim0 = await page.locator(".setting-row", { hasText: "高亮颜色" }).innerText();
 check("默认跟随主题", dim0.includes("跟随主题"), dim0.replace(/\n/g, " "));
 const themeColor = await getVar();
-check("主题色已注入", themeColor.length > 0, themeColor);
+check("默认高亮为强调色淡染（非面板底色）", themeColor.startsWith("rgba(") && !themeColor.includes("NaN"), themeColor);
+const barColor = await page.evaluate(() => document.querySelector(".editor-host")?.style.getPropertyValue("--np-linebar") || "");
+check("左竖条颜色已注入", barColor.startsWith("#"), barColor);
 
 // 设置自定义颜色
 await page.locator('.modal input[type="color"]').fill("#ff2e88");
@@ -79,7 +81,8 @@ check("切主题后自定义色保留", (await getVar()) === "#ff2e88", await ge
 await page.locator('.modal button[title*="恢复"], .modal button', { hasText: "跟随主题" }).first().click();
 await page.waitForTimeout(200);
 const back = await getVar();
-check("恢复跟随主题", back.length > 0 && back !== "rgb(255, 46, 136)", back);
+const barAfter = await page.evaluate(() => document.querySelector(".editor-host")?.style.getPropertyValue("--np-linebar") || "");
+check("恢复跟随主题", back.startsWith("rgba(") && barAfter.startsWith("#"), `${back} / ${barAfter}`);
 
 await browser.close();
 await server.close();

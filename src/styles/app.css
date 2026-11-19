@@ -1307,10 +1307,13 @@ button.link {
 /* 当前段落高亮（亮色，盖过当前行高亮） */
 .editor-host .cm-line.cm-para-line {
   background-color: var(--np-para, #333846) !important;
+  /* 行首竖条：强调色实色，与底色/标注色明显区分（v0.11.5） */
+  box-shadow: inset 3px 0 0 var(--np-linebar, transparent);
 }
 /* 当前行高亮同样使用可配置颜色（v0.11.3） */
 .editor-host .cm-activeLine {
   background-color: var(--np-para, transparent) !important;
+  box-shadow: inset 3px 0 0 var(--np-linebar, transparent);
 }
 
 /* 标注：高亮（颜色由内联样式给出）/ 划线 */

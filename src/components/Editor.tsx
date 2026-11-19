@@ -140,6 +140,19 @@ function buildColumnSelection(view: EditorView, ax: number, ay: number, bx: numb
 }
 
 /** 主题 → CodeMirror 扩展（背景/前景/行号/当前行/光标 + 语法高亮） */
+/** hex → rgba 字符串 */
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.replace("#", "");
+  const v = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
+  const n = parseInt(v, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/** 光标行/段落默认高亮：主题强调色淡染（比面板底色醒目，与标注色系区分） */
+function defaultHighlightBg(t: ThemeDef): string {
+  return hexToRgba(t.colors.accent, t.dark ? 0.22 : 0.16);
+}
+
 function themeFromDef(t: ThemeDef): Extension {
   const theme = EditorView.theme(
     {
@@ -342,7 +355,7 @@ export default function Editor({
     if (!host) return;
     host.style.setProperty("--np-bg", theme.colors.bg);
     host.style.setProperty("--np-fg", theme.colors.fg);
-    host.style.setProperty("--np-para", theme.colors.para);
+    host.style.setProperty("--np-para", defaultHighlightBg(theme));
     host.style.setProperty("--np-accent", theme.colors.accent);
     host.dataset.dark = theme.dark ? "1" : "0";
   }, [theme]);
@@ -391,10 +404,14 @@ export default function Editor({
         themeComp.reconfigure(themeFromDef(findTheme(settings.theme))),
       ],
     });
-    // 光标行高亮颜色：用户设定优先，否则跟随主题
+    // 光标行高亮颜色：用户设定优先；默认用主题强调色淡染（与底色、标注色明显区分）
     hostRef.current?.style.setProperty(
       "--np-para",
-      settings.paraColor || findTheme(settings.theme).colors.para
+      settings.paraColor || defaultHighlightBg(findTheme(settings.theme))
+    );
+    hostRef.current?.style.setProperty(
+      "--np-linebar",
+      settings.paraColor || findTheme(settings.theme).colors.accent
     );
   }, [settings]);
 

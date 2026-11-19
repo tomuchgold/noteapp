@@ -201,7 +201,7 @@ export default function SettingsDialog({ value, onChange, onClose }: Props) {
         <div className="setting-row">
           <label>
             高亮颜色
-            <span className="dim">{value.paraColor ? "自定义" : "跟随主题"}</span>
+            <span className="dim">{value.paraColor ? "自定义" : "跟随主题（强调色淡染+左竖条）"}</span>
           </label>
           <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input
