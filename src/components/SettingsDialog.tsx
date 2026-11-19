@@ -78,7 +78,7 @@ export default function SettingsDialog({ value, onChange, onClose }: Props) {
   return (
     <div className="modal-mask" onClick={onClose}>
       <div className="modal settings" onClick={(e) => e.stopPropagation()}>
-        <h3>编辑器设置</h3>
+        <h3>编辑器设置 <span style={{opacity:.5,fontSize:12,fontWeight:400}}>v{__APP_VERSION__}</span></h3>
 
         <div className="setting-row">
           <label>
