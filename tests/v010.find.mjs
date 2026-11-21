@@ -142,7 +142,10 @@ await page.waitForTimeout(200);
 
 const inputs = page.locator(".findbar-input");
 await inputs.nth(1).fill("bird");
+// v0.14：全部替换先进入逐条预览弹窗，确认后才写入文档
 await page.locator(".findbar-btn", { hasText: "全部替换" }).click();
+await page.waitForSelector(".replace-preview-modal");
+await page.locator(".replace-preview-modal .modal-actions button.primary").click();
 await page.waitForTimeout(300);
 const docText = await page.locator(".cm-content").innerText();
 check("全部替换生效", !docText.includes("cat") && docText.includes("bird"), docText.replace(/\n/g, " | "));

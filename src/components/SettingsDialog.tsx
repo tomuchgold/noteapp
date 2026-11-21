@@ -13,9 +13,10 @@ interface Props {
   value: EditorSettings;
   onChange: (s: EditorSettings) => void;
   onClose: () => void;
+  onOpenKeymap: () => void;
 }
 
-export default function SettingsDialog({ value, onChange, onClose }: Props) {
+export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap }: Props) {
   const set = (patch: Partial<EditorSettings>) => onChange({ ...value, ...patch });
   const [themes, setThemes] = useState<ThemeDef[]>(() => allThemes());
   const [customMsg, setCustomMsg] = useState<string | null>(null);
@@ -238,6 +239,11 @@ export default function SettingsDialog({ value, onChange, onClose }: Props) {
               </button>
             )}
           </span>
+        </div>
+
+        <div className="setting-row">
+          <Label icon="⌨️" name="快捷键" tip="自定义内置命令、命名宏、代码片段的快捷键；也支持插入日期时间、注释、表格等快捷命令。" />
+          <button onClick={onOpenKeymap}>打开快捷键设置</button>
         </div>
 
         <div className="modal-actions">

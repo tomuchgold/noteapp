@@ -15,6 +15,10 @@ export interface MacroDialogProps {
   onImport: (json: string) => void;
   onExport: () => void;
   onImportTemplate: () => void;
+  /** 取某命令当前快捷键 */
+  shortcutOf: (commandId: string) => string;
+  /** 打开快捷键设置并定位到某宏 */
+  onBindKey: (macroId: string) => void;
 }
 
 /** 把动作序列渲染成简短可读摘要 */
@@ -29,6 +33,7 @@ function summarize(items: MacroItem[]): string {
 
 export default function MacroDialog({
   open, macros, liveItems, onClose, onSave, onReplay, onDelete, onRename, onImport, onExport, onImportTemplate,
+  shortcutOf, onBindKey,
 }: MacroDialogProps) {
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -131,9 +136,13 @@ export default function MacroDialog({
                     </button>
                   )}
                   <div className="dim macro-item-sum" title={summarize(m.items)}>{summarize(m.items)}</div>
-                  <div className="dim macro-item-meta">{m.items.length} 个动作</div>
+                  <div className="dim macro-item-meta">
+                    {m.items.length} 个动作
+                    {shortcutOf(`macro:${m.id}`) && <>　⌨ <kbd>{shortcutOf(`macro:${m.id}`)}</kbd></>}
+                  </div>
                 </div>
                 <div className="macro-item-btns">
+                  <button onClick={() => onBindKey(m.id)} title="设置快捷键">⌨️</button>
                   <button onClick={() => { setEditingId(m.id); setEditName(m.name); }} title="重命名">✏️</button>
                   <button onClick={() => onDelete(m.id)} title="删除">🗑️</button>
                 </div>

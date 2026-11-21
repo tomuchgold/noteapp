@@ -17,9 +17,19 @@ import FindBar from "./components/FindBar";
 import SearchResults from "./components/SearchResults";
 import AnnoPanel from "./components/AnnoPanel";
 import MacroDialog from "./components/MacroDialog";
+import SnippetDialog from "./components/SnippetDialog";
+import KeymapDialog from "./components/KeymapDialog";
+import ReplacePreviewDialog from "./components/ReplacePreviewDialog";
 import {
   addMacro, deleteMacro, exportMacros, importMacros, loadMacros, renameMacro, type SavedMacro,
 } from "./lib/macros";
+import {
+  addSnippet, deleteSnippet, expandSnippet, exportSnippets, importSnippets, loadSnippetBindings,
+  saveSnippetBindings, seedSnippetsIfEmpty, updateSnippet, type Snippet,
+} from "./lib/snippets";
+import {
+  BUILTIN_COMMANDS, effectiveKey, loadBindings, normalizeEvent, saveBindings, type Bindings,
+} from "./lib/keymap";
 import { printDocument } from "./lib/print";
 import {
   applyCase,
@@ -27,8 +37,10 @@ import {
   findAll,
   lineHitPos,
   lineHits,
-  replaceAll,
+  replacePreviews,
+  applySelectedReplacements,
   type FolderHitGroup,
+  type ReplacePreview,
   type SearchOptions,
 } from "./lib/search";
 import AiSettingsDialog from "./components/AiSettingsDialog";
@@ -76,7 +88,7 @@ import {
   type Annotation,
   type AnnotationKind,
 } from "./lib/annotations";
-import { EXT_LANG } from "./lib/lang";
+import { EXT_LANG, commentTokens } from "./lib/lang";
 import {
   VIRTUAL,
   filterFiles,
@@ -145,6 +157,16 @@ export default function App() {
   const macroRef = useRef<MacroItem[]>([]);
   const [macroDialogOpen, setMacroDialogOpen] = useState(false);
   const [savedMacros, setSavedMacros] = useState<SavedMacro[]>(() => loadMacros());
+  // 片段 / 快捷键 / 替换预览
+  const [snippets, setSnippets] = useState<Snippet[]>(() => seedSnippetsIfEmpty());
+  const [snippetDialogOpen, setSnippetDialogOpen] = useState(false);
+  const [keymapDialogOpen, setKeymapDialogOpen] = useState(false);
+  const [keymapFocus, setKeymapFocus] = useState<string | null>(null);
+  const [bindings, setBindings] = useState<Bindings>(() => loadBindings());
+  const [snippetBindings, setSnippetBindings] = useState<Bindings>(() => loadSnippetBindings());
+  const [replacePreviewOpen, setReplacePreviewOpen] = useState(false);
+  const [replacePreviewItems, setReplacePreviewItems] = useState<ReplacePreview[]>([]);
+  const [pendingReplacement, setPendingReplacement] = useState("");
   const actionCount = useRef(0);
   const sessionLoaded = useRef(false);
 
@@ -451,11 +473,10 @@ export default function App() {
     [activeTab, findMatches, findCurrent, findOptions, updateTab]
   );
 
-  /** 全部替换（可撤销：替换前后各入一次历史，CodeMirror 的 undo 会合并为一步） */
-  const doReplaceAll = useCallback(
-    (replacement: string) => {
-      if (!activeTab || findMatches.length === 0) return;
-      const { text, count } = replaceAll(activeTab.content, findQuery, replacement, findOptions);
+  /** 真正执行「全部替换」（由预览弹窗确认后调用） */
+  const applyReplacement = useCallback(
+    (text: string, count: number) => {
+      if (!activeTab) return;
       updateTab(activeTab.id, { content: text, dirty: true });
       setFindCurrent(0);
       findCurrentRef.current = -1;
@@ -463,7 +484,31 @@ export default function App() {
       setReplaceMsg(`已替换 ${count} 处`);
       window.setTimeout(() => setReplaceMsg(null), 4000);
     },
-    [activeTab, findMatches.length, findQuery, findOptions, updateTab]
+    [activeTab, updateTab]
+  );
+
+  /** 打开替换预览：先算逐条 diff，让用户确认后再执行 */
+  const doReplaceAll = useCallback(
+    (replacement: string) => {
+      if (!activeTab || findMatches.length === 0) return;
+      const previews = replacePreviews(activeTab.content, findQuery, replacement, findOptions);
+      if (previews.length === 0) return;
+      setReplacePreviewItems(previews);
+      setPendingReplacement(replacement);
+      setReplacePreviewOpen(true);
+    },
+    [activeTab, findMatches.length, findQuery, findOptions]
+  );
+
+  /** 预览弹窗确认：按勾选执行替换 */
+  const confirmReplace = useCallback(
+    (picked: ReplacePreview[]) => {
+      if (!activeTab || picked.length === 0) { setReplacePreviewOpen(false); return; }
+      const { text, count } = applySelectedReplacements(activeTab.content, picked);
+      applyReplacement(text, count);
+      setReplacePreviewOpen(false);
+    },
+    [activeTab, applyReplacement]
   );
 
   /** 在文件夹中查找 */
@@ -603,6 +648,21 @@ export default function App() {
     actionCount.current += 1;
     setActionSignal({ type: "insert-text", n: actionCount.current, text });
   }, []);
+
+  /** 插入当前日期时间 / 日期 / 时间 */
+  const insertDateTime = useCallback((mode: "datetime" | "date" | "time") => {
+    const now = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    const d = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+    const t = `${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
+    insertText(mode === "date" ? d : mode === "time" ? t : `${d} ${t}`);
+  }, [insertText]);
+
+  /** 按当前文件类型插入注释 */
+  const insertComment = useCallback((block = false) => {
+    const tok = commentTokens(activeTab?.path ?? activeTab?.name ?? null);
+    insertText(block ? `${tok.blockStart}注释内容${tok.blockEnd}` : `${tok.line}注释内容${tok.lineEnd ?? ""}`);
+  }, [insertText, activeTab]);
 
   const activeIsMarkdown = !!activeTab && (/\.(md|markdown)$/i.test(activeTab.name) || /\.(md|markdown)$/i.test(activeTab.path ?? ""));
   void activeIsMarkdown; // 预览按钮对所有文档开放；保留标记供状态提示使用
@@ -1083,6 +1143,48 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   }, []);
 
+  // ---------- 快捷键绑定（内置 / 宏 / 片段） ----------
+  const handleBindingsChange = useCallback((b: Bindings) => { saveBindings(b); setBindings(b); }, []);
+  const handleBindMacro = useCallback((id: string, key: string) => {
+    setBindings((prev) => { const next = { ...prev, [`macro:${id}`]: key }; saveBindings(next); return next; });
+  }, []);
+  const handleBindSnippet = useCallback((id: string, key: string) => {
+    setSnippetBindings((prev) => { const next = { ...prev, [`snippet:${id}`]: key }; saveSnippetBindings(next); return next; });
+  }, []);
+  const shortcutOf = useCallback((id: string) => {
+    const b = id.startsWith("snippet:") ? snippetBindings : bindings;
+    return b[id] || "";
+  }, [bindings, snippetBindings]);
+  const openKeymapFor = useCallback((cmd?: string) => { setKeymapFocus(cmd ?? null); setKeymapDialogOpen(true); }, []);
+
+  // ---------- 片段管理 ----------
+  const handleAddSnippet = useCallback((abbr: string, body: string, name: string) => setSnippets(addSnippet(abbr, body, name)), []);
+  const handleUpdateSnippet = useCallback((id: string, patch: Partial<Pick<Snippet, "abbr" | "body" | "name">>) => setSnippets(updateSnippet(id, patch)), []);
+  const handleDeleteSnippet = useCallback((id: string) => setSnippets(deleteSnippet(id)), []);
+  const handleImportSnippets = useCallback((json: string) => setSnippets(importSnippets(json)), []);
+  const handleExportSnippets = useCallback(() => {
+    const blob = new Blob([exportSnippets()], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notepp-snippets.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, []);
+  const handleSnippetTemplate = useCallback(() => {
+    const blob = new Blob([JSON.stringify({
+      format: "notepp-snippets", version: 1,
+      snippets: [
+        { abbr: "sig", name: "签名", body: "\n—— NotePP\n" },
+        { abbr: "now", name: "当前时间", body: "${NOW}" },
+      ],
+    }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notepp-snippets-example.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, []);
+
   // 录制中捕获按键（排除应用级快捷键与纯修饰键）
   useEffect(() => {
     if (!recording) return;
@@ -1102,65 +1204,93 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [recording]);
 
-  // ---------- 快捷键 ----------
+  // ---------- 命令执行器（快捷键 / 菜单共用） ----------
+  const executeCommand = useCallback((id: string) => {
+    // 动态命令：宏
+    if (id.startsWith("macro:")) {
+      const m = savedMacros.find((x) => x.id === id.slice(6));
+      if (m) playItems(m.items);
+      return;
+    }
+    // 动态命令：片段
+    if (id.startsWith("snippet:")) {
+      const s = snippets.find((x) => x.id === id.slice(8));
+      if (s) insertText(expandSnippet(s.body));
+      return;
+    }
+    // 内置命令
+    switch (id) {
+      case "insert-datetime": insertDateTime("datetime"); break;
+      case "insert-date": insertDateTime("date"); break;
+      case "insert-time": insertDateTime("time"); break;
+      case "insert-comment": insertComment(false); break;
+      case "insert-block-comment": insertComment(true); break;
+      case "insert-table": setTableOpen(true); break;
+      case "insert-divider": insertText("\n---\n"); break;
+      case "find": openFind(); break;
+      case "find-next": stepFind(1); break;
+      case "toggle-sidebar": setLayout((l) => ({ ...l, sidebarOpen: !l.sidebarOpen })); break;
+      case "toggle-filelist": setLayout((l) => ({ ...l, filelistOpen: !l.filelistOpen })); break;
+      case "toggle-split": toggleSplit(); break;
+      case "toggle-preview": setPreviewOpen(true); break;
+      case "print": doPrint(); break;
+      case "save": if (activeTab) saveTab(activeTab); break;
+      case "newtab": newTab(); break;
+      case "record-macro": toggleRecord(); break;
+      case "replay-macro": replayMacro(); break;
+      default: break;
+    }
+  }, [
+    savedMacros, playItems, snippets, insertText, insertDateTime, insertComment,
+    openFind, stepFind, toggleSplit, doPrint, activeTab, saveTab, newTab, toggleRecord, replayMacro,
+  ]);
+
+  // ---------- 快捷键（自定义绑定优先 + 内置兜底） ----------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 快捷键设置弹窗录制时，由弹窗在捕获阶段处理，这里不会收到事件
+      const typingInField = !!(e.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]");
       // Esc 关闭查找浮窗（焦点不在浮窗内时也要生效）
-      if (e.key === "Escape" && findOpen) {
-        setFindOpen(false);
+      if (e.key === "Escape" && findOpen) { setFindOpen(false); return; }
+
+      const norm = normalizeEvent(e);
+      // 1) 完整映射：内置默认 + 用户覆盖 + 动态（宏/片段）
+      const map = new Map<string, string>();
+      for (const c of BUILTIN_COMMANDS) {
+        const k = effectiveKey(c.id, bindings, c.defaultKey);
+        if (k) map.set(k, c.id);
+      }
+      for (const [id, k] of Object.entries(bindings)) if (k && id.startsWith("macro:")) map.set(k, id);
+      for (const [id, k] of Object.entries(snippetBindings)) if (k) map.set(k, id);
+
+      let cmd = map.get(norm);
+      // ⌘ 是 Mac 上的 Ctrl 等价物；用户显式绑定的 Meta+xxx 优先，所以这里只做兜底
+      if (!cmd && norm.startsWith("Meta+")) cmd = map.get(`Ctrl+${norm.slice(5)}`);
+      // Shift+F3 复用「跳到下一处」，执行时按 shiftKey 反向
+      if (!cmd && norm === "Shift+F3") cmd = map.get("F3");
+      // CodeMirror 的搜索 keymap 可能已处理 F3，避免一次按键跳两次
+      if (cmd === "find-next" && e.defaultPrevented) return;
+      // 输入框里敲普通字符不能被单键命令抢走；带修饰键或功能键仍允许触发
+      const hasMod = e.ctrlKey || e.metaKey || e.altKey;
+      const isFunctionKey = /^F\d+$/.test(e.key);
+      if (cmd && typingInField && !hasMod && !isFunctionKey) return;
+
+      if (cmd) {
+        e.preventDefault();
+        if (cmd === "find-next") stepFind(e.shiftKey ? -1 : 1);
+        else executeCommand(cmd);
         return;
       }
+      // 2) 兜底：未纳入命令表的内置键（打开/关闭/反向查找/复位/另存为/切换标签）
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const key = e.key.toLowerCase();
-      if (key === "n" && !e.shiftKey) {
-        e.preventDefault();
-        newTab();
-      } else if (key === "o") {
-        e.preventDefault();
-        openDialog();
-      } else if (key === "s" && !e.shiftKey) {
-        e.preventDefault();
-        if (activeTab) saveTab(activeTab);
-      } else if (key === "s" && e.shiftKey) {
-        e.preventDefault();
-        if (activeTab) saveTab(activeTab, true);
-      } else if (key === "w") {
-        e.preventDefault();
-        if (activeId) closeTab(activeId);
-      } else if (key === "b" && e.shiftKey) {
-        e.preventDefault();
-        setLayout((l) => ({ ...l, filelistOpen: !l.filelistOpen }));
-      } else if (key === "b") {
-        e.preventDefault();
-        setLayout((l) => ({ ...l, sidebarOpen: !l.sidebarOpen }));
-      } else if (key === "f") {
-        e.preventDefault();
-        openFind();
-      } else if (key === "h") {
-        // Ctrl+H：打开查找并聚焦替换框（与查找栏共用）
-        e.preventDefault();
-        openFind();
-      } else if (key === "f3") {
-        e.preventDefault();
-        stepFind(e.shiftKey ? -1 : 1);
-      } else if (key === "escape") {
-        setFindOpen(false);
-      } else if (key === "r" && e.shiftKey) {
-        e.preventDefault();
-        toggleRecord();
-      } else if (key === "p" && e.shiftKey) {
-        e.preventDefault();
-        replayMacro();
-      } else if (key === "0") {
-        // Ctrl+0 复位缩放 100%
-        e.preventDefault();
-        resetZoom();
-      } else if (key === "p" && !e.shiftKey) {
-        // Ctrl+P 打印 / 导出 PDF
-        e.preventDefault();
-        doPrint();
-      } else if (key === "tab") {
+      if (key === "o") { e.preventDefault(); openDialog(); }
+      else if (key === "w") { e.preventDefault(); if (activeId) closeTab(activeId); }
+      else if (key === "h") { e.preventDefault(); openFind(); }
+      else if (key === "0") { e.preventDefault(); resetZoom(); }
+      else if (key === "s" && e.shiftKey) { e.preventDefault(); if (activeTab) saveTab(activeTab, true); }
+      else if (key === "tab") {
         e.preventDefault();
         if (tabs.length > 1 && activeId) {
           const idx = tabs.findIndex((t) => t.id === activeId);
@@ -1170,7 +1300,10 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [newTab, openDialog, saveTab, closeTab, activeTab, activeId, tabs, toggleRecord, replayMacro, openFind, stepFind, doPrint, findOpen]);
+  }, [
+    bindings, snippetBindings, executeCommand, findOpen, openDialog, closeTab,
+    activeTab, activeId, tabs, openFind, stepFind, resetZoom, saveTab,
+  ]);
 
   // 状态栏点击：循环切换保存编码
   useEffect(() => {
@@ -1299,8 +1432,22 @@ export default function App() {
         <button onClick={() => activeTab && saveTab(activeTab)}>保存</button>
         <button onClick={() => activeTab && saveTab(activeTab, true)}>另存为</button>
         <button onClick={() => setDiffDialog(true)}>对比</button>
-        <button onClick={() => openFind()} title="查找替换 (Ctrl+F，Shift+F3 反向)">
+        <button onClick={() => openFind()} title="查找替换 (Ctrl+F，F3 下一处，Shift+F3 反向)">
           查找
+        </button>
+        <button
+          onClick={() => insertDateTime("datetime")}
+          disabled={!activeTab}
+          title="插入当前日期时间 (Ctrl+Alt+D)"
+        >
+          时间
+        </button>
+        <button
+          onClick={() => insertComment(false)}
+          disabled={!activeTab}
+          title="按当前文件类型插入行注释 (Ctrl+Alt+C)"
+        >
+          注释
         </button>
         <button onClick={() => activeId && closeTab(activeId)}>关闭</button>
         <button
@@ -1322,6 +1469,18 @@ export default function App() {
           title="宏管理：保存当前录制为命名宏、回放/重命名/删除、导入导出 JSON"
         >
           宏管理
+        </button>
+        <button
+          onClick={() => setSnippetDialogOpen(true)}
+          title="片段/模板管理：输入缩写后按 Tab 展开，支持 ${NOW}/${DATE}/${TIME}"
+        >
+          片段
+        </button>
+        <button
+          onClick={() => openKeymapFor()}
+          title="快捷键设置：内置命令、宏、片段均可自定义按键"
+        >
+          快捷键
         </button>
         <button
           onClick={() => patchLayout({ sidebarOpen: !layout.sidebarOpen })}
@@ -1568,6 +1727,7 @@ export default function App() {
               onDeleteAnnotation={handleDeleteAnnotation}
               searchMarks={searchMarks}
               gotoRequest={gotoRequest}
+              snippets={snippets}
             />
             </>
           )
@@ -1600,6 +1760,7 @@ export default function App() {
             settings={editorSettings}
             onZoom={zoomEditor}
             readOnly={splitTab.readOnly}
+            snippets={snippets}
           />
         </div>
       )}
@@ -1727,6 +1888,7 @@ export default function App() {
           value={editorSettings}
           onChange={setEditorSettings}
           onClose={() => setSettingsOpen(false)}
+          onOpenKeymap={() => { setSettingsOpen(false); openKeymapFor(); }}
         />
       )}
 
@@ -1743,6 +1905,47 @@ export default function App() {
         onImport={handleImportMacros}
         onExport={handleExportMacros}
         onImportTemplate={handleMacroTemplate}
+        shortcutOf={shortcutOf}
+        onBindKey={(id) => openKeymapFor(`macro:${id}`)}
+      />
+
+      {/* 片段 / 模板管理弹窗 */}
+      <SnippetDialog
+        open={snippetDialogOpen}
+        snippets={snippets}
+        shortcutOf={shortcutOf}
+        onClose={() => setSnippetDialogOpen(false)}
+        onAdd={handleAddSnippet}
+        onUpdate={handleUpdateSnippet}
+        onDelete={handleDeleteSnippet}
+        onImport={handleImportSnippets}
+        onExport={handleExportSnippets}
+        onTemplate={handleSnippetTemplate}
+        onBindKey={(id) => openKeymapFor(`snippet:${id}`)}
+      />
+
+      {/* 快捷键设置弹窗 */}
+      <KeymapDialog
+        open={keymapDialogOpen}
+        bindings={bindings}
+        snippetBindings={snippetBindings}
+        macros={savedMacros}
+        snippets={snippets}
+        focusCommand={keymapFocus}
+        onClose={() => { setKeymapDialogOpen(false); setKeymapFocus(null); }}
+        onChange={handleBindingsChange}
+        onBindMacro={handleBindMacro}
+        onBindSnippet={handleBindSnippet}
+      />
+
+      {/* 替换预览弹窗 */}
+      <ReplacePreviewDialog
+        open={replacePreviewOpen}
+        query={findQuery}
+        replacement={pendingReplacement}
+        previews={replacePreviewItems}
+        onClose={() => setReplacePreviewOpen(false)}
+        onConfirm={confirmReplace}
       />
 
       {/* 插入表格 */}

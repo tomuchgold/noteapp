@@ -25,6 +25,7 @@ import type { EditorSettings } from "../lib/settings";
 import { effectiveFontSize } from "../lib/settings";
 import { findTheme, type ThemeDef } from "../lib/themes";
 import { HIGHLIGHT_COLORS, reconcileAnnotations, type Annotation, type AnnotationKind } from "../lib/annotations";
+import { expandSnippet, type Snippet } from "../lib/snippets";
 import type { MacroItem } from "../lib/types";
 
 /** 宏回放：按键 → CodeMirror 命令 */
@@ -72,6 +73,8 @@ interface Props {
   searchMarks?: { from: number; to: number; current: boolean }[];
   /** 跳转请求（改变序号时生效）：跳到指定位置 */
   gotoRequest?: { n: number; from: number; to: number } | null;
+  /** 代码片段列表：输入缩写后按 Tab 展开 */
+  snippets?: Snippet[];
 }
 
 const languageComp = new Compartment();
@@ -338,12 +341,15 @@ export default function Editor({
   onDeleteAnnotation,
   searchMarks = [],
   gotoRequest,
+  snippets = [],
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onCursorRef = useRef(onCursor);
   const onZoomRef = useRef(onZoom);
+  const snippetsRef = useRef(snippets);
+  snippetsRef.current = snippets;
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; text: string } | null>(null);
   const [noteInput, setNoteInput] = useState<{ text: string; from: number; to: number; x: number; y: number } | null>(null);
   const switchingRef = useRef(false);
@@ -388,6 +394,31 @@ export default function Editor({
           autocompletion(),
           highlightSelectionMatches(),
           keymap.of([
+            // 代码片段：输入缩写后按 Tab 展开（优先于缩进 Tab）
+            {
+              key: "Tab",
+              run: (view) => {
+                const snips = snippetsRef.current;
+                if (!snips.length) return false;
+                const sel = view.state.selection.main;
+                if (sel.from !== sel.head) return false; // 有选区时不展开
+                const line = view.state.doc.lineAt(sel.head);
+                const before = line.text.slice(0, sel.head - line.from);
+                const match = before.match(/([^\s]+)$/);
+                if (!match) return false;
+                const abbr = match[1];
+                const snip = snips.find((s) => s.abbr === abbr);
+                if (!snip) return false;
+                const from = sel.head - abbr.length;
+                const body = expandSnippet(snip.body);
+                view.dispatch({
+                  changes: { from, to: sel.head, insert: body },
+                  selection: { anchor: from + body.length },
+                  scrollIntoView: true,
+                });
+                return true;
+              },
+            },
             ...closeBracketsKeymap,
             ...defaultKeymap,
             ...searchKeymap,

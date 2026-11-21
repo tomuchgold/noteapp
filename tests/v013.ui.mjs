@@ -117,7 +117,8 @@ const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem("not
 check("宏持久化到 localStorage", persisted.length === 1 && persisted[0].items.length >= 3, `items=${persisted[0]?.items?.length}`);
 
 // 重命名
-await page.locator(".macro-item", { hasText: "测试宏A" }).locator(".macro-item-btns button").first().click();
+// v0.14 起宏项第一个按钮是「设置快捷键」，第二个才是重命名
+await page.locator(".macro-item", { hasText: "测试宏A" }).locator(".macro-item-btns button").nth(1).click();
 await page.waitForTimeout(80);
 await page.locator(".macro-rename-input").fill("测试宏B");
 await page.locator(".macro-rename-input").press("Enter");
@@ -134,7 +135,8 @@ const exported = readFileSync(dlPath, "utf-8");
 check("导出 JSON 含宏数据", exported.includes("测试宏B") && exported.includes("notepp-macros"), `len=${exported.length}`);
 
 // 删除
-await page.locator(".macro-item", { hasText: "测试宏B" }).locator(".macro-item-btns button").nth(1).click();
+// v0.14：⌨️ / ✏️ / 🗑️，删除是第三个按钮
+await page.locator(".macro-item", { hasText: "测试宏B" }).locator(".macro-item-btns button").nth(2).click();
 await page.waitForTimeout(120);
 check("宏删除成功", (await page.locator(".macro-empty").count()) >= 1);
 
@@ -215,7 +217,7 @@ const manualPath = "/workspace/site/manual.html";
 check("功能手册网页存在", existsSync(manualPath));
 if (existsSync(manualPath)) {
   const html = readFileSync(manualPath, "utf-8");
-  check("手册含版本 v0.13.0", html.includes("v0.13.0"));
+  check("手册含版本 v0.14.0", html.includes("v0.14.0"));
   check("手册覆盖全部功能章节", ["文件与标签", "编辑体验", "主题外观", "查找替换", "Markdown", "对比与预览", "标注", "宏", "AI 辅助", "快捷键"].every((k) => html.includes(k)));
   check("手册含宏保存与导入导出说明", html.includes("宏管理") && html.includes("导入") && html.includes("导出"));
   check("首页有功能手册入口", readFileSync("/workspace/site/index.html", "utf-8").includes("manual.html"));

@@ -164,6 +164,71 @@ export function replaceAll(
 }
 
 /** 跨文件夹查到的一条命中 */
+/** 单条替换预览：命中区间 + 替换前后文本 + 所在行 */
+export interface ReplacePreview {
+  index: number;      // 序号（0 基）
+  from: number;
+  to: number;
+  before: string;
+  after: string;
+  line: number;       // 行号（1 基）
+  lineText: string;   // 所在行完整文本
+}
+
+/**
+ * 生成「全部替换」的逐条预览（不改变文本）。
+ * 正则模式支持 $1…$9 捕获组；非正则用 applyCase 处理大小写。
+ */
+export function replacePreviews(
+  text: string,
+  query: string,
+  replacement: string,
+  opt: SearchOptions,
+  max = 2000
+): ReplacePreview[] {
+  const pieces: { from: number; to: number; before: string; after: string }[] = [];
+
+  if (opt.regex) {
+    const re = buildRegExp(query, opt);
+    if (!re) return [];
+    for (const m of text.matchAll(re)) {
+      if (pieces.length >= max) break;
+      const from = m.index ?? 0;
+      const before = m[0];
+      const groups = m.slice();
+      const after = replacement.replace(/\$(\d)/g, (_, d: string) => groups[Number(d)] ?? "");
+      pieces.push({ from, to: from + before.length, before, after });
+    }
+  } else {
+    for (const m of findAll(text, query, opt)) {
+      if (pieces.length >= max) break;
+      const before = text.slice(m.from, m.to);
+      pieces.push({ from: m.from, to: m.to, before, after: applyCase(before, replacement, opt) });
+    }
+  }
+
+  return pieces.map((p, index) => {
+    const lineStart = text.lastIndexOf("\n", Math.max(0, p.from - 1)) + 1;
+    let lineEnd = text.indexOf("\n", p.to);
+    if (lineEnd < 0) lineEnd = text.length;
+    const line = text.slice(0, p.from).split("\n").length;
+    return {
+      index, from: p.from, to: p.to, before: p.before, after: p.after,
+      line, lineText: text.slice(lineStart, lineEnd),
+    };
+  });
+}
+
+/** 按勾选的预览项执行替换（从后往前应用，避免位置偏移） */
+export function applySelectedReplacements(text: string, previews: ReplacePreview[]): { text: string; count: number } {
+  const picked = [...previews].sort((a, b) => b.from - a.from);
+  let out = text;
+  for (const p of picked) {
+    out = out.slice(0, p.from) + p.after + out.slice(p.to);
+  }
+  return { text: out, count: picked.length };
+}
+
 export interface FolderHit {
   path: string;
   line: number;

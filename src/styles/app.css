@@ -2540,6 +2540,226 @@ button:focus-visible,
   color: var(--ui-accent);
 }
 
+/* ===== v0.14 片段 / 快捷键 / 替换预览弹窗 ===== */
+.modal.snippet-modal,
+.modal.keymap-modal,
+.modal.replace-preview-modal {
+  width: min(680px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.modal.keymap-modal { width: min(760px, 94vw); }
+.modal.replace-preview-modal { width: min(760px, 94vw); }
+
+.snippet-editor {
+  background: var(--ui-panel-2, var(--ui-bg));
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.snippet-editor-row {
+  display: flex;
+  gap: 10px;
+}
+.snippet-editor-row label,
+.snippet-body-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
+}
+.snippet-editor-row label { flex: 1; min-width: 0; }
+.snippet-editor input,
+.snippet-editor textarea,
+.rp-filter,
+.keymap-toolbar input {
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-fg);
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: calc(12.5px * var(--ui-scale, 1));
+  font-family: inherit;
+  outline: none;
+}
+.snippet-editor input:focus,
+.snippet-editor textarea:focus,
+.rp-filter:focus,
+.keymap-toolbar input:focus { border-color: var(--ui-accent); }
+.snippet-editor textarea {
+  resize: vertical;
+  min-height: 62px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.snippet-body-label { margin-top: 10px; }
+.snippet-body-label code {
+  color: var(--ui-accent);
+  background: var(--ui-hover);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.snippet-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.snippet-abbr {
+  color: var(--ui-accent);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: calc(13.5px * var(--ui-scale, 1));
+  font-weight: 700;
+}
+.snippet-key {
+  margin-top: 3px;
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  color: var(--ui-fg-dim);
+}
+kbd {
+  display: inline-block;
+  background: var(--ui-panel-2, var(--ui-bg));
+  border: 1px solid var(--ui-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: var(--ui-fg);
+  line-height: 1.35;
+}
+
+.keymap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: calc(12px * var(--ui-scale, 1));
+}
+.keymap-toolbar input { flex: 1; }
+.keymap-msg {
+  background: rgba(255, 168, 0, 0.12);
+  border: 1px solid rgba(255, 168, 0, 0.5);
+  border-radius: 6px;
+  color: var(--ui-fg);
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  font-size: calc(12px * var(--ui-scale, 1));
+}
+.keymap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+.keymap-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ui-panel-2, var(--ui-bg));
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  padding: 7px 9px;
+}
+.keymap-info { flex: 1; min-width: 0; }
+.keymap-name {
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 600;
+}
+.keymap-desc {
+  margin-top: 2px;
+  font-size: calc(11px * var(--ui-scale, 1));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.keymap-key {
+  min-width: 120px;
+  text-align: right;
+  font-size: calc(12px * var(--ui-scale, 1));
+}
+.keymap-recording {
+  color: var(--ui-danger, #ff6b6b);
+  font-weight: 700;
+  animation: notepp-blink 1s steps(2, start) infinite;
+}
+@keyframes notepp-blink { 50% { opacity: 0.35; } }
+.keymap-row > button {
+  background: var(--ui-panel-2);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-fg);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: calc(11.5px * var(--ui-scale, 1));
+  cursor: pointer;
+}
+.keymap-row > button:hover { border-color: var(--ui-accent); background: var(--ui-hover); }
+
+.rp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: calc(12px * var(--ui-scale, 1));
+}
+.rp-toolbar label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.rp-toolbar .spacer { flex: 1; }
+.rp-filter { width: 230px; }
+.rp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+.rp-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  background: var(--ui-panel-2, var(--ui-bg));
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  padding: 7px 9px;
+  cursor: pointer;
+  font-size: calc(12.5px * var(--ui-scale, 1));
+}
+.rp-item.on { border-color: var(--ui-accent); }
+.rp-item:hover { background: var(--ui-hover); }
+.rp-line {
+  flex-shrink: 0;
+  color: var(--ui-fg-dim);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: calc(11px * var(--ui-scale, 1));
+  padding-top: 1px;
+}
+.rp-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+.rp-old,
+.rp-new {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  border-radius: 3px;
+  padding: 1px 4px;
+  word-break: break-all;
+}
+.rp-old {
+  background: rgba(255, 90, 90, 0.16);
+  color: var(--ui-danger, #ff7675);
+  text-decoration: line-through;
+}
+.rp-new {
+  background: rgba(70, 200, 120, 0.16);
+  color: var(--ui-success, #55c98a);
+}
+.rp-arrow { color: var(--ui-fg-dim); }
+
 /* 设置项 label 不参与收缩、名称不换行（避免 emoji 挤压导致竖排） */
 .modal.settings .setting-row > label {
   flex-shrink: 0;

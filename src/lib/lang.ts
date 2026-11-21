@@ -77,4 +77,41 @@ export function detectLanguage(path: string | null): { name: string; ext: Extens
   return EXT_LANG[ext] ?? { name: "纯文本", ext: null };
 }
 
+/** 文件扩展名 → 行注释前缀 / 块注释起止（用于「插入注释」命令） */
+export interface CommentTokens {
+  line: string;
+  /** HTML/Markdown 这类行注释也是成对出现的，需要补尾部闭合符 */
+  lineEnd?: string;
+  blockStart: string;
+  blockEnd: string;
+}
+
+export function commentTokens(path: string | null): CommentTokens {
+  if (!path) return { line: "# ", blockStart: "/* ", blockEnd: " */" };
+  const file = path.split(/[\\/]/).pop() ?? "";
+  const dot = file.lastIndexOf(".");
+  const ext = dot > 0 ? file.slice(dot + 1).toLowerCase() : "";
+  // HTML / XML / Vue / SVG：HTML 注释
+  if (["html", "htm", "vue", "xml", "svg", "xaml"].includes(ext)) {
+    return { line: "<!-- ", lineEnd: " -->", blockStart: "<!-- ", blockEnd: " -->" };
+  }
+  // CSS / SCSS / Less：块注释为主
+  if (["css", "scss", "less"].includes(ext)) {
+    return { line: "// ", blockStart: "/* ", blockEnd: " */" };
+  }
+  // Python / Shell / YAML / Ruby / Perl / Lua / Fortran：# 行注释
+  if (["py", "pyw", "sh", "bash", "zsh", "yml", "yaml", "rb", "pl"].includes(ext)) {
+    return { line: "# ", blockStart: '"""', blockEnd: '"""' };
+  }
+  if (["lua"].includes(ext)) return { line: "-- ", blockStart: "--[[ ", blockEnd: " ]]" };
+  if (["sql"].includes(ext)) return { line: "-- ", blockStart: "/* ", blockEnd: " */" };
+  if (["pas"].includes(ext)) return { line: "// ", blockStart: "{ ", blockEnd: " }" };
+  // Markdown / 纯文本 / 日志
+  if (["md", "markdown", "txt", "log"].includes(ext)) {
+    return { line: "<!-- ", lineEnd: " -->", blockStart: "<!-- ", blockEnd: " -->" };
+  }
+  // 其余 C 系 / Java / Go / Rust / JS / TS：// 行注释
+  return { line: "// ", blockStart: "/* ", blockEnd: " */" };
+}
+
 export { EXT_LANG };

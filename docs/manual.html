@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.13.0</title>
+<title>NotePP 功能手册 — v0.14.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.13.0</span>
+    <span class="ver-badge">v0.14.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -175,6 +175,7 @@
       <a href="#sec-ai" data-kw="AI 动作 自定义指令 服务商 Key DeepSeek GLM Kimi">09 AI 辅助</a>
       <a href="#sec-system" data-kw="更新 官网 版本号 会话恢复 布局 拖拽 媒体">10 系统与便捷</a>
       <a href="#sec-shortcuts" data-kw="快捷键 键位 Ctrl F3 列表">11 快捷键速查表</a>
+      <a href="#sec-snippets" data-kw="片段 模板 缩写 Tab 日期 时间 注释 表格 自定义快捷键 冲突 替换预览">12 片段与效率增强</a>
     </div>
     <div class="side-foot">提示：顶部搜索框可实时过滤目录，按 <kbd>Enter</kbd> 跳转到首个匹配章节，<kbd>Esc</kbd> 清空。</div>
   </aside>
@@ -182,10 +183,10 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.13.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.14.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.13.0</b></span>
-        <span><b>11</b> 大功能类别</span>
+        <span>当前版本 <b>v0.14.0</b></span>
+        <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
       </div>
@@ -356,6 +357,13 @@
       </div>
 
       <div class="feature">
+        <h3><span class="ic">PRE</span>替换逐条预览</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">点「全部替换」不再盲替换：先列出每一处命中的<b>行号、替换前、替换后</b>，可筛选并逐条勾选。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">填好查找与替换文本 → 点「全部替换（预览）」→ 在弹窗里取消不需要的项 → 点「执行替换」。正则模式支持 <code>$1</code>～<code>$9</code> 捕获组。</span></div>
+        <div class="path"><span class="badge">路径</span>查找浮窗 → 全部替换（预览）</div>
+      </div>
+
+      <div class="feature">
         <h3><span class="ic">🪟</span>可拖动的查找浮窗</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">查找浮窗可从主窗口拖出，放到副屏使用；字号可通过「查找框字号」倍率单独调整。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">按住浮窗标题栏拖动即可脱离主窗口；拖回窗口区域可重新停靠。</span></div>
@@ -515,6 +523,13 @@ graph LR
         <div class="path"><span class="badge">路径</span>菜单栏「宏管理」→ 导入 / 导出 / 示例</div>
       </div>
 
+      <div class="feature">
+        <h3><span class="ic">KEY</span>宏绑定快捷键</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">每个命名宏都能绑定自己的快捷键，不必先打开宏管理窗口再点宏名。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在「宏管理」列表点目标宏右侧的键盘按钮 → 弹出快捷键设置后按下组合键 → 以后直接按该键即可回放。冲突的键位会被拦截并提示。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「宏管理」→ 目标宏 → 设置快捷键</div>
+      </div>
+
       <div class="tip"><b>提示：</b>宏动作支持文本输入与常见按键（Enter、Tab、Backspace、方向键等）；录制时会自动排除应用级快捷键，避免误录。</div>
     </section>
 
@@ -567,7 +582,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.13.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.14.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 
@@ -629,10 +644,46 @@ graph LR
           <tr><td><kbd>Esc</kbd></td><td>关闭查找浮窗</td></tr>
           <tr><td><kbd>Alt + 拖拽</kbd></td><td>临时进入列编辑（矩形选区）</td></tr>
           <tr><td>中键点击标签</td><td>关闭该标签</td></tr>
+          <tr><td><kbd>Ctrl + Alt + D</kbd></td><td>插入当前日期时间（可改键）</td></tr>
+          <tr><td><kbd>Ctrl + Alt + C</kbd></td><td>按文件类型插入注释（可改键）</td></tr>
+          <tr><td><kbd>Ctrl + Alt + T</kbd></td><td>打开插入表格对话框（可改键）</td></tr>
+          <tr><td>自定义键位</td><td>菜单栏「快捷键」或「设置 → 快捷键」中修改；宏与片段也能绑定</td></tr>
         </tbody>
       </table>
 
-      <div class="tip"><b>说明：</b>所有快捷键在 macOS 上将 <kbd>Ctrl</kbd> 替换为 <kbd>⌘ / Cmd</kbd>；菜单按钮的悬浮提示（title）中也标注了对应键位，可随时对照。</div>
+      <div class="tip"><b>说明：</b>所有快捷键在 macOS 上将 <kbd>Ctrl</kbd> 替换为 <kbd>⌘ / Cmd</kbd>；菜单按钮的悬浮提示（title）中也标注了对应键位。自定义键位保存在本机，检测冲突；录制时按 <kbd>Esc</kbd> 取消、<kbd>Backspace</kbd> 清除绑定。</div>
+    </section>
+    <!-- 12 片段与效率增强 -->
+    <section class="doc-section" id="sec-snippets">
+      <h2><span class="num">12</span> 片段与效率增强</h2>
+      <p class="sec-lead">把常用文本、日期时间、注释与表格变成一键输入，并按需重排所有键位。</p>
+
+      <div class="feature">
+        <h3><span class="ic">TAB</span>代码片段 / 模板</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">片段 = 缩写 + 内容。在编辑器中输入缩写后按 <kbd>Tab</kbd> 即可展开为整段文本；适合签名、待办项、常用代码块。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点菜单「片段」打开管理窗口，填写缩写、名称和内容后添加。支持 JSON 导入 / 导出与示例模板，按 ID 去重合并。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「片段」　<span class="badge">用法</span>输入缩写 + <kbd>Tab</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">NOW</span>动态占位符</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">片段内容支持 <code>${NOW}</code>、<code>${DATE}</code>、<code>${TIME}</code>，展开时自动替换为当前时间。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">例如片段内容写 <code>记录于 ${NOW}</code>，展开后就是 <code>记录于 2026-11-21 09:30:15</code>。</span></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">INS</span>快捷插入：日期、注释、表格</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">菜单与快捷键都提供快捷插入：当前日期时间、按文件类型生成注释、Markdown 表格、分隔线。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">默认 <kbd>Ctrl+Alt+D</kbd> 插入日期时间、<kbd>Ctrl+Alt+C</kbd> 插入注释、<kbd>Ctrl+Alt+T</kbd> 打开表格弹窗；菜单里也有「时间 / 注释 / 表格」按钮。注释符号会按扩展名自动选择 <code>//</code>、<code>#</code>、<code>&lt;!-- --&gt;</code> 等。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「时间 / 注释 / 表格」　<span class="badge">快捷键</span><kbd>Ctrl+Alt+D</kbd><kbd>Ctrl+Alt+C</kbd><kbd>Ctrl+Alt+T</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">KEY</span>快捷键设置中心</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置命令、命名宏、代码片段全部集中在一个窗口里改键；用户设置优先于默认值，并做冲突检测。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点菜单「快捷键」或「设置 → 打开快捷键设置」，搜索命令后点「设置」并按键；<kbd>Esc</kbd> 取消，<kbd>Backspace</kbd> 清除。也可从宏管理 / 片段管理的键盘按钮直接跳到对应命令。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「快捷键」· 设置 → 快捷键</div>
+      </div>
     </section>
   </main>
 </div>

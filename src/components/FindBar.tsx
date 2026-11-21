@@ -264,8 +264,13 @@ export default function FindBar(props: FindBarProps) {
             <button className="findbar-btn wide" onClick={() => onReplace(replacement)} disabled={total === 0}>
               替换
             </button>
-            <button className="findbar-btn wide" onClick={() => onReplaceAll(replacement)} disabled={total === 0}>
-              全部替换
+            <button
+              className="findbar-btn wide"
+              onClick={() => onReplaceAll(replacement)}
+              disabled={total === 0}
+              title="打开逐条预览，可勾选要替换的命中项后再执行"
+            >
+              全部替换（预览）
             </button>
           </div>
         )}
