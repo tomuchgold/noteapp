@@ -7,6 +7,12 @@ export interface AnnoPanelProps {
   onJump: (ann: Annotation) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  /** 朗读该标注文本（TTS） */
+  onSpeak: (text: string) => void;
+  /** 复制该标注文本到剪贴板 */
+  onCopy: (text: string) => void;
+  /** 把该标注文本插入当前光标处 */
+  onPaste: (text: string) => void;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -15,8 +21,17 @@ const KIND_LABEL: Record<string, string> = {
   note: "备注",
 };
 
-/** 标注导航面板：当前文件所有划线/标注，点击跳转 */
-export default function AnnoPanel({ open, annotations, onJump, onDelete, onClose }: AnnoPanelProps) {
+/** 标注导航面板：当前文件所有划线/标注，点击跳转；每条可朗读/复制/粘贴 */
+export default function AnnoPanel({
+  open,
+  annotations,
+  onJump,
+  onDelete,
+  onClose,
+  onSpeak,
+  onCopy,
+  onPaste,
+}: AnnoPanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,7 +49,9 @@ export default function AnnoPanel({ open, annotations, onJump, onDelete, onClose
           标注<span className="dim">　{list.length} 条</span>
         </span>
         <span className="spacer" />
-        <button className="anno-panel-btn" onClick={onClose} title="关闭标注面板">×</button>
+        <button className="anno-panel-close" onClick={onClose} title="关闭标注面板">
+          ✕ 关闭
+        </button>
       </div>
       <div className="anno-panel-list" ref={listRef}>
         {list.length === 0 ? (
@@ -55,13 +72,36 @@ export default function AnnoPanel({ open, annotations, onJump, onDelete, onClose
                 <span className="anno-item-text">{a.text.trim() || "(空)"}</span>
                 {a.note && <span className="anno-item-note">{a.note}</span>}
               </button>
-              <button
-                className="anno-item-del"
-                onClick={() => onDelete(a.id)}
-                title="删除该标注"
-              >
-                ×
-              </button>
+              <span className="anno-item-ops">
+                <button
+                  className="anno-op"
+                  onClick={() => onSpeak(a.note ? `${a.text}，备注：${a.note}` : a.text)}
+                  title="朗读该标注（TTS）"
+                >
+                  🔊
+                </button>
+                <button
+                  className="anno-op"
+                  onClick={() => onCopy(a.text)}
+                  title="复制该标注文本"
+                >
+                  📋
+                </button>
+                <button
+                  className="anno-op"
+                  onClick={() => onPaste(a.text)}
+                  title="把该标注文本插入当前光标处"
+                >
+                  📥
+                </button>
+                <button
+                  className="anno-item-del"
+                  onClick={() => onDelete(a.id)}
+                  title="删除该标注"
+                >
+                  ×
+                </button>
+              </span>
             </div>
           ))
         )}

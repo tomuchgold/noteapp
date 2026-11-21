@@ -121,7 +121,7 @@ if (annoCount > 0) {
   await page.waitForTimeout(200);
   check("删除标注后列表清空", (await page.locator(".anno-item").count()) === 0);
 }
-await page.locator(".anno-panel-head button", { hasText: "×" }).click();
+await page.locator(".anno-panel-close").click();
 await page.waitForTimeout(200);
 check("标注面板可关闭", (await page.locator(".anno-panel").count()) === 0);
 

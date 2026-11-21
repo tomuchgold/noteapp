@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.16.0</title>
+<title>NotePP 功能手册 — v0.17.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.16.0</span>
+    <span class="ver-badge">v0.17.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.16.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.17.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.16.0</b></span>
+        <span>当前版本 <b>v0.17.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -501,7 +501,21 @@ graph LR
     <!-- 07 标注 -->
     <section class="doc-section" id="sec-annotation">
       <h2><span class="num">07</span> 🖍️ 标注</h2>
-      <p class="sec-lead">划线、高亮、备注随文字自动位移，按文件持久化。</p>
+      <p class="sec-lead">划线、高亮、备注随文字自动位移，按文件持久化；面板里还能朗读、复制、粘贴。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🧰</span>标注面板：朗读 / 复制 / 粘贴</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">标注面板每条标注附带三个操作：<b>🔊 朗读</b>（TTS 读出原文与备注）、<b>📋 复制</b>（复制标注文本）、<b>📥 粘贴</b>（把标注文本插入当前光标处）。面板标题栏有醒目的「✕ 关闭」按钮。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">菜单栏「🖍️ 标注」打开面板 → 每条右侧点击对应按钮；朗读引擎在「设置 → 朗读 TTS」中配置。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「标注」→ 面板内 🔊 / 📋 / 📥 按钮</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔊</span>朗读（TTS）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">文字转语音朗读。<b>系统内置引擎</b>免配置、离线可用（桌面与安卓均支持）；也可切换 <b>OpenAI 兼容接口</b>（/audio/speech），自定义接口地址、Key、模型与音色。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">「设置 → 朗读 TTS」选择引擎、填好配置、点「🔊 试听」验证；朗读入口在标注面板每条的 🔊 按钮。单次朗读最长 3000 字。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 朗读 TTS</div>
+      </div>
 
       <div class="feature">
         <h3><span class="ic">✏️</span>划线 / 高亮 / 备注</h3>
@@ -617,7 +631,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.16.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.17.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 

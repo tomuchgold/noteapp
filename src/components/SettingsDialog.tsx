@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { DEFAULT_SETTINGS, UI_SCALE_MAX, UI_SCALE_MIN, ZOOM_MAX, ZOOM_MIN, type EditorSettings } from "../lib/settings";
 import {
+  loadTtsConfig,
+  saveTtsConfig,
+  speak,
+  stopSpeaking,
+  type TtsConfig,
+} from "../lib/tts";
+import {
   allThemes,
   isValidTheme,
   loadCustomThemes,
@@ -20,6 +27,20 @@ export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap 
   const set = (patch: Partial<EditorSettings>) => onChange({ ...value, ...patch });
   const [themes, setThemes] = useState<ThemeDef[]>(() => allThemes());
   const [customMsg, setCustomMsg] = useState<string | null>(null);
+  const [tts, setTts] = useState<TtsConfig>(() => loadTtsConfig());
+  const [ttsMsg, setTtsMsg] = useState<string | null>(null);
+  const setTtsCfg = (patch: Partial<TtsConfig>) => {
+    const next = { ...tts, ...patch };
+    setTts(next);
+    saveTtsConfig(next);
+  };
+  const trySpeak = () => {
+    setTtsMsg(null);
+    stopSpeaking();
+    speak("你好，这是 NotePP 的朗读试听。Hello from NotePP.", tts)
+      .then(() => setTtsMsg("正在朗读…点击「停止」可中断"))
+      .catch((e) => setTtsMsg(`朗读失败：${e instanceof Error ? e.message : e}`));
+  };
 
   /** 设置项标签：emoji 图标 + 名称 + 悬停说明（原生 title，桌面与安卓均可用） */
   const Label = ({ icon, name, tip, dim }: { icon: string; name: string; tip: string; dim?: React.ReactNode }) => (
@@ -245,6 +266,56 @@ export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap 
           <Label icon="⌨️" name="快捷键" tip="自定义内置命令、命名宏、代码片段的快捷键；也支持插入日期时间、注释、表格等快捷命令。" />
           <button onClick={onOpenKeymap}>打开快捷键设置</button>
         </div>
+
+        <div className="setting-row">
+          <Label icon="🔊" name="朗读引擎" tip="系统内置：无需配置、离线可用（推荐）；OpenAI 兼容接口：填 API 地址与 Key，用云端音色朗读。" dim={<span className="dim">{tts.engine === "system" ? "系统内置（离线）" : "OpenAI 兼容接口"}</span>} />
+          <select value={tts.engine} onChange={(e) => setTtsCfg({ engine: e.target.value as TtsConfig["engine"] })}>
+            <option value="system">系统内置（免配置）</option>
+            <option value="openai">OpenAI 兼容接口</option>
+          </select>
+        </div>
+
+        {tts.engine === "openai" && (
+          <>
+            <div className="setting-row">
+              <Label icon="🌐" name="TTS 接口地址" tip="OpenAI 兼容 /audio/speech 接口的基础地址，例如 https://api.openai.com/v1。" />
+              <input
+                type="text"
+                value={tts.apiBase}
+                placeholder="https://api.openai.com/v1"
+                style={{ width: 220 }}
+                onChange={(e) => setTtsCfg({ apiBase: e.target.value })}
+              />
+            </div>
+            <div className="setting-row">
+              <Label icon="🔑" name="TTS API Key" tip="朗读接口的鉴权 Key，保存在本地，不会上传。" />
+              <input
+                type="password"
+                value={tts.apiKey}
+                placeholder="sk-…"
+                style={{ width: 220 }}
+                onChange={(e) => setTtsCfg({ apiKey: e.target.value })}
+              />
+            </div>
+            <div className="setting-row">
+              <Label icon="🧠" name="TTS 模型" tip="例如 tts-1 / tts-1-hd，按服务商支持的填写。" />
+              <input type="text" value={tts.model} style={{ width: 120 }} onChange={(e) => setTtsCfg({ model: e.target.value })} />
+            </div>
+            <div className="setting-row">
+              <Label icon="🎙️" name="TTS 音色" tip="例如 alloy / echo / fable / onyx / nova / shimmer。" />
+              <input type="text" value={tts.voice} style={{ width: 120 }} onChange={(e) => setTtsCfg({ voice: e.target.value })} />
+            </div>
+          </>
+        )}
+
+        <div className="setting-row">
+          <Label icon="▶️" name="试听" tip="用当前朗读引擎播放一句示例，验证配置是否可用。" />
+          <span style={{ display: "flex", gap: 6 }}>
+            <button onClick={trySpeak}>🔊 试听</button>
+            <button onClick={() => { stopSpeaking(); setTtsMsg(null); }}>⏹️ 停止</button>
+          </span>
+        </div>
+        {ttsMsg && <div className="dim theme-msg">{ttsMsg}</div>}
 
         <div className="modal-actions">
           <button onClick={() => onChange({ ...DEFAULT_SETTINGS })}>恢复默认</button>

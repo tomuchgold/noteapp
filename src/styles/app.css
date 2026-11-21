@@ -2120,6 +2120,37 @@ button.link {
 }
 .anno-item-del:hover { opacity: 1; background: var(--ui-hover, #2a2a2a); }
 
+/* v0.17 标注面板：朗读/复制/粘贴操作按钮 + 显眼的关闭按钮 */
+.anno-item-ops {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.anno-op {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 14px;
+  line-height: 1;
+}
+.anno-op:hover { opacity: 1; background: var(--ui-hover, #2a2a2a); border-radius: 4px; }
+.anno-panel-close {
+  flex: 0 0 auto;
+  background: var(--ui-hover, #2a2a2a);
+  border: 1px solid var(--ui-border, #444);
+  color: inherit;
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.anno-panel-close:hover { background: var(--ui-accent, #4a90d9); color: #fff; }
+
 /* ===== v0.11.1 对比视图：模式切换 + 渲染预览 ===== */
 .diff-modes {
   display: flex;

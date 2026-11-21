@@ -44,7 +44,7 @@ interface Props {
   content: string;
   languagePath: string | null;
   onChange: (value: string) => void;
-  onCursor: (line: number, col: number, selected: number) => void;
+  onCursor: (line: number, col: number, selected: number, selectedText?: string) => void;
   /** 外部请求触发（Ctrl+F、宏回放、AI 写回、插入表格/文本） */
   actionSignal: { type: string; n: number; items?: MacroItem[]; text?: string } | null;
   /** 编辑器样式设置 */
@@ -436,7 +436,12 @@ export default function Editor({
             if (u.docChanged || u.selectionSet) {
               const sel = u.state.selection.main;
               const line = u.state.doc.lineAt(sel.head);
-              onCursorRef.current(line.number, sel.head - line.from + 1, sel.to - sel.from);
+              onCursorRef.current(
+                line.number,
+                sel.head - line.from + 1,
+                sel.to - sel.from,
+                sel.from !== sel.to ? u.state.doc.sliceString(sel.from, sel.to) : ""
+              );
             }
           }),
         ],

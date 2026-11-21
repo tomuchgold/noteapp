@@ -30,6 +30,7 @@ import {
 import {
   BUILTIN_COMMANDS, effectiveKey, loadBindings, normalizeEvent, saveBindings, type Bindings,
 } from "./lib/keymap";
+import { loadTtsConfig, speak, stopSpeaking } from "./lib/tts";
 import { printDocument } from "./lib/print";
 import {
   applyCase,
@@ -597,9 +598,13 @@ export default function App() {
   /** openPath 的引用（避免循环依赖，供 openFolderHit 使用） */
   const openPathRef = useRef<(p: string) => Promise<void>>(async () => {});
 
+  /** 编辑器当前选中文本（Ctrl/F 自动带入用；CodeMirror 状态来源，比 DOM selection 可靠） */
+  const selectionTextRef = useRef("");
+
   /** 打开查找栏（带入选中文本） */
   const openFind = useCallback(() => {
-    const sel = window.getSelection()?.toString() ?? "";
+    const cmSel = selectionTextRef.current.trim();
+    const sel = cmSel || (window.getSelection()?.toString() ?? "");
     setFindSeed(sel.length > 0 && sel.length < 300 ? sel : "");
     setFindOpen(true);
   }, []);
@@ -640,6 +645,32 @@ export default function App() {
     [activePath]
   );
 
+  /** 朗读标注文本（先停止上一次朗读） */
+  const handleAnnoSpeak = useCallback(async (text: string) => {
+    try {
+      stopSpeaking();
+      await speak(text, loadTtsConfig());
+    } catch (e) {
+      alert(`朗读失败：${e instanceof Error ? e.message : e}`);
+    }
+  }, []);
+
+  /** 复制标注文本到剪贴板 */
+  const handleAnnoCopy = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // 兜底：老 WebView 不支持 async clipboard
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+  }, []);
+
+
   // ---------- 标注导航面板 ----------
   const [annoOpen, setAnnoOpen] = useState(false);
   const [transformOpen, setTransformOpen] = useState(false);
@@ -678,6 +709,13 @@ export default function App() {
     actionCount.current += 1;
     setActionSignal({ type: "transform", n: actionCount.current, text: kind });
   }, []);
+  /** 把标注文本粘贴（插入）到当前光标处 */
+  const handleAnnoPaste = useCallback(
+    (text: string) => {
+      insertText(text);
+    },
+    [insertText]
+  );
 
   const activeIsMarkdown = !!activeTab && (/\.(md|markdown)$/i.test(activeTab.name) || /\.(md|markdown)$/i.test(activeTab.path ?? ""));
   void activeIsMarkdown; // 预览按钮对所有文档开放；保留标记供状态提示使用
@@ -1988,7 +2026,10 @@ export default function App() {
               content={activeTab.content}
               languagePath={activeTab.path}
               onChange={(v) => updateTab(activeTab.id, { content: v, dirty: true })}
-              onCursor={(line, col, selected) => setCursor({ line, col, selected })}
+              onCursor={(line, col, selected, selText) => {
+                setCursor({ line, col, selected });
+                selectionTextRef.current = selText ?? "";
+              }}
               actionSignal={actionSignal}
               settings={editorSettings}
               onZoom={zoomEditor}
@@ -2049,6 +2090,9 @@ export default function App() {
           onJump={jumpToAnnotation}
           onDelete={handleDeleteAnnotation}
           onClose={() => setAnnoOpen(false)}
+          onSpeak={(t) => void handleAnnoSpeak(t)}
+          onCopy={(t) => void handleAnnoCopy(t)}
+          onPaste={handleAnnoPaste}
         />
       )}
 
