@@ -2334,3 +2334,226 @@ button:focus-visible,
 .diff-modes button {
   transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
+
+/* ===== v0.13.0 搜索结果面板增强：更高 / 字更大 / 更醒目 ===== */
+.search-results {
+  height: 264px;
+  min-height: 150px;
+  background: var(--ui-panel-2, var(--ui-bg, #1e1e1e));
+  border-top: 1px solid var(--ui-accent, #4a9eff);
+  box-shadow: 0 -3px 14px rgba(0, 0, 0, 0.18);
+}
+.search-results-head {
+  padding: 6px 12px;
+  font-size: calc(14px * var(--ui-scale, 1));
+  font-weight: 600;
+  background: var(--ui-panel, #21252b);
+  color: var(--ui-fg, #ddd);
+  border-bottom: 1px solid var(--ui-border, #333);
+}
+.search-results-title .dim {
+  font-weight: 400;
+  opacity: 0.85;
+}
+.search-results-btn {
+  font-size: calc(14px * var(--ui-scale, 1));
+  padding: 3px 10px;
+  font-weight: 600;
+}
+.search-results-list {
+  font-size: calc(14px * var(--ui-scale, 1));
+  line-height: 1.75;
+  padding: 2px 0;
+}
+.search-results-hit {
+  padding: 3px 12px;
+  gap: 10px;
+  border-bottom: 1px solid var(--ui-border, #333);
+}
+.search-results-hit.cur {
+  background: var(--ui-accent-soft, rgba(79, 156, 249, 0.16));
+  box-shadow: inset 3px 0 0 var(--ui-accent, #4a9eff);
+  font-weight: 600;
+}
+.search-results-line {
+  flex-basis: 3.6em;
+  color: var(--ui-accent, #4a9eff);
+  opacity: 1;
+  font-weight: 600;
+}
+.search-results-text mark {
+  background: rgba(255, 196, 0, 0.55);
+  color: #1a1a1a;
+  font-weight: 700;
+  padding: 0 2px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 196, 0, 0.75);
+}
+
+/* 设置弹窗：emoji 图标 + 名称排版 */
+.setting-row label .setting-emoji {
+  display: inline-block;
+  width: 1.5em;
+  text-align: center;
+  font-size: calc(14px * var(--ui-scale, 1));
+  filter: saturate(0.9);
+}
+.setting-row label .setting-name {
+  font-weight: 500;
+}
+.setting-row label[title] {
+  cursor: help;
+  border-bottom: 1px dotted transparent;
+}
+.setting-row label[title]:hover {
+  border-bottom-color: var(--ui-fg-dim, #888);
+}
+
+/* 宏管理弹窗 */
+.modal.macro-modal {
+  width: 560px;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+.macro-save-box {
+  background: var(--ui-panel-2, var(--ui-bg));
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.macro-save-title {
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--ui-accent, #4a9eff);
+}
+.macro-save-row {
+  display: flex;
+  gap: 8px;
+}
+.macro-save-row input,
+.macro-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-fg);
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-family: inherit;
+  outline: none;
+}
+.macro-save-row input:focus,
+.macro-rename-input:focus {
+  border-color: var(--ui-accent);
+}
+.macro-hint {
+  margin-top: 8px;
+  font-size: calc(11px * var(--ui-scale, 1));
+}
+.macro-list-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 600;
+  margin: 4px 0 8px;
+}
+.macro-ops {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.macro-ops button {
+  background: var(--ui-panel-2);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-fg);
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: calc(11.5px * var(--ui-scale, 1));
+  cursor: pointer;
+}
+.macro-ops button:hover:not(:disabled) {
+  border-color: var(--ui-accent);
+  background: var(--ui-hover);
+}
+.macro-ops button:disabled { opacity: 0.45; cursor: default; }
+.macro-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.macro-empty {
+  padding: 22px;
+  text-align: center;
+  color: var(--ui-fg-dim);
+  font-size: calc(12.5px * var(--ui-scale, 1));
+  border: 1px dashed var(--ui-border);
+  border-radius: 8px;
+}
+.macro-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ui-panel-2, var(--ui-bg));
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+.macro-item-main { flex: 1; min-width: 0; }
+.macro-item-name {
+  background: none;
+  border: none;
+  color: var(--ui-accent, #4a9eff);
+  font-size: calc(13.5px * var(--ui-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.macro-item-name:hover { text-decoration: underline; }
+.macro-item-sum {
+  font-size: calc(11.5px * var(--ui-scale, 1));
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.macro-item-meta { font-size: calc(10.5px * var(--ui-scale, 1)); margin-top: 2px; }
+.macro-item-btns { display: flex; gap: 4px; }
+.macro-item-btns button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 4px;
+  border-radius: 5px;
+}
+.macro-item-btns button:hover { background: var(--ui-hover); }
+.macro-msg {
+  margin-top: 10px;
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--ui-accent);
+}
+
+/* 设置项 label 不参与收缩、名称不换行（避免 emoji 挤压导致竖排） */
+.modal.settings .setting-row > label {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.modal.settings .setting-row > label .setting-name {
+  white-space: nowrap;
+}
+/* 主题网格那一行允许换行：label 占满一行，色块在下方铺开 */
+.modal.settings .setting-row.setting-theme {
+  flex-wrap: wrap;
+}
+.modal.settings .setting-row.setting-theme > .theme-grid,
+.modal.settings .setting-row.setting-theme > .theme-ops,
+.modal.settings .setting-row.setting-theme > .theme-msg {
+  width: 100%;
+}

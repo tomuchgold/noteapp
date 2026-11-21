@@ -167,6 +167,56 @@ function buildColumnSelection(view: EditorView, ax: number, ay: number, bx: numb
   return EditorSelection.create(ranges);
 }
 
+/**
+ * 列编辑「补空格成直线」：把矩形覆盖到的短行/空行用空格补齐到统一的列边界 x2，
+ * 使所有行的选区右端对齐成一条直线（非直线的列选没有实际编辑意义）。
+ * 返回需要插入的空格变更；调用方在 pointerup 时一次性 dispatch。
+ *
+ * 注意：字体为等宽时每个字符宽度一致，用「行尾 x → 目标 x」的像素差除以单字符宽度
+ * 估算空格数；补完后由 buildColumnSelection 重新按 x 定位，得到真正对齐的矩形选区。
+ */
+function padColumnLines(view: EditorView, ax: number, ay: number, bx: number, by: number) {
+  const x2 = Math.max(ax, bx);
+  const x1 = Math.min(ax, bx);
+  const underLine = (y: number): number => {
+    const pos = view.posAtCoords({ x: x1, y });
+    if (pos != null) return view.state.doc.lineAt(pos).number;
+    const block = view.lineBlockAtHeight(y);
+    return view.state.doc.lineAt(Math.min(Math.max(block.from, 0), view.state.doc.length)).number;
+  };
+  const l1 = Math.min(underLine(ay), underLine(by));
+  const l2 = Math.max(underLine(ay), underLine(by));
+
+  // 估算单个半角字符（空格）宽度：取首个非空行，比较相邻两个位置的 x
+  let charW = 8;
+  const doc = view.state.doc;
+  for (let n = 1; n <= doc.lines && n <= l2 + 1; n++) {
+    const line = doc.line(n);
+    if (line.to > line.from) {
+      const c0 = view.coordsAtPos(line.from);
+      const c1 = view.coordsAtPos(Math.min(line.from + 1, line.to));
+      if (c0 && c1 && c1.left > c0.left) {
+        charW = c1.left - c0.left;
+        break;
+      }
+    }
+  }
+  if (charW <= 0) charW = 8;
+
+  const changes: { from: number; insert: string }[] = [];
+  for (let n = l1; n <= l2; n++) {
+    const line = doc.line(n);
+    const end = view.coordsAtPos(line.to);
+    // 行尾渲染 x（空行时 coordsAtPos 仍给出该行起点 x）
+    const endX = end ? end.left : x1;
+    if (endX < x2 - charW * 0.4) {
+      const need = Math.max(1, Math.ceil((x2 - endX) / charW));
+      changes.push({ from: line.to, insert: " ".repeat(need) });
+    }
+  }
+  return changes;
+}
+
 /** 主题 → CodeMirror 扩展（背景/前景/行号/当前行/光标 + 语法高亮） */
 /** hex → rgba 字符串 */
 function hexToRgba(hex: string, alpha: number): string {
@@ -525,6 +575,12 @@ export default function Editor({
       if (!dragging) return;
       e.stopImmediatePropagation();
       e.preventDefault();
+      // 松手时：先把短行/空行补空格到统一列边界，让选区成为一条直线，
+      // 再用同一组坐标重建矩形选区（此时每行都够长，from/to 自然对齐）。
+      const changes = padColumnLines(view, sx, sy, e.clientX, e.clientY);
+      if (changes.length) {
+        view.dispatch({ changes, scrollIntoView: false });
+      }
       const sel = buildColumnSelection(view, sx, sy, e.clientX, e.clientY);
       if (sel) view.dispatch({ selection: sel });
       dragging = false;

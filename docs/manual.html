@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NotePP 功能手册 — v0.13.0</title>
+<meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
+<link rel="icon" href="assets/icon.png">
+<style>
+  :root {
+    --bg: #16161f;
+    --panel: #1e1e2c;
+    --fg: #e6e6f0;
+    --dim: #9a9ab0;
+    --accent: #61afef;
+    --accent2: #bd93f9;
+    --border: #2c2c3d;
+    --green: #2ea043;
+    --yellow: #e5c07b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.75;
+    font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+
+  /* 顶部导航 —— 沿用官网风格 */
+  nav {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(22, 22, 31, 0.94);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 16px; min-height: 56px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+  nav .back {
+    font-size: 13px; color: var(--fg); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 13px; white-space: nowrap;
+  }
+  nav .back:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+  nav .logo { font-weight: 700; font-size: 17px; color: var(--fg); white-space: nowrap; }
+  nav .logo span { color: var(--accent); }
+  nav .logo .sub { color: var(--dim); font-size: 13px; font-weight: 500; margin-left: 4px; }
+  .ver-badge {
+    font-size: 12px; color: var(--accent2); border: 1px solid rgba(189,147,249,.45);
+    border-radius: 999px; padding: 2px 10px; white-space: nowrap;
+  }
+  .search-box { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .search-box input {
+    width: 250px; max-width: 52vw; padding: 7px 12px; font-size: 13px;
+    color: var(--fg); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; outline: none; font-family: inherit;
+  }
+  .search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(97,175,239,.15); }
+  .search-box input::placeholder { color: var(--dim); }
+  .search-count { font-size: 12px; color: var(--dim); min-width: 62px; white-space: nowrap; }
+
+  /* 两栏布局 */
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 36px; max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+  .sidebar { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; padding: 26px 0 40px; border-right: 1px solid var(--border); }
+  .side-title { font-size: 12px; letter-spacing: 2px; color: var(--accent2); font-weight: 700; margin: 0 0 12px 14px; }
+  .toc a {
+    display: block; font-size: 14px; color: var(--dim); padding: 7px 14px;
+    border-left: 2px solid transparent; line-height: 1.5;
+  }
+  .toc a:hover { color: var(--fg); text-decoration: none; background: rgba(97,175,239,.06); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; background: rgba(97,175,239,.08); }
+  .toc a.match { color: var(--fg); background: rgba(189,147,249,.16); border-left-color: var(--accent2); border-radius: 0 6px 6px 0; }
+  .toc a.filtered { display: none !important; }
+  .side-foot { margin: 22px 14px 0; padding-top: 16px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--dim); line-height: 1.7; }
+
+  .content { padding: 30px 0 90px; min-width: 0; }
+  .hero { padding: 26px 0 34px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+  .hero h1 { font-size: 36px; line-height: 1.3; letter-spacing: .5px; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p.sub { color: var(--dim); margin-top: 12px; font-size: 16px; max-width: 720px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .meta span { font-size: 12.5px; color: var(--dim); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; }
+  .meta span b { color: var(--accent2); font-weight: 600; }
+
+  .doc-section { padding-top: 48px; scroll-margin-top: 80px; transition: box-shadow .3s; }
+  .doc-section.search-hit { box-shadow: inset 3px 0 0 var(--accent2); }
+  .doc-section > h2 { font-size: 25px; padding-bottom: 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .doc-section > h2 .num { font-size: 13px; color: var(--accent2); font-family: ui-monospace, Menlo, monospace; }
+  .sec-lead { color: var(--dim); font-size: 14px; margin: 10px 0 20px; }
+
+  .feature { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; }
+  .feature h3 { font-size: 16px; margin-bottom: 4px; display: flex; align-items: center; gap: 9px; }
+  .feature h3 .ic { font-size: 19px; }
+  .frow { display: flex; gap: 10px; margin-top: 8px; font-size: 14px; }
+  .flabel { flex: 0 0 52px; color: var(--accent2); font-weight: 700; font-size: 12.5px; padding-top: 2px; }
+  .ftext { color: var(--dim); min-width: 0; }
+  .ftext b { color: var(--fg); font-weight: 600; }
+  .path { margin-top: 12px; font-size: 12.5px; color: var(--dim); border-top: 1px dashed var(--border); padding-top: 10px; }
+  .path .badge { display: inline-block; font-size: 11px; color: var(--accent2); border: 1px solid rgba(189,147,249,.4); border-radius: 4px; padding: 0 6px; margin-right: 6px; }
+
+  kbd {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 7px; margin: 0 2px; color: var(--fg); white-space: nowrap;
+  }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; color: var(--yellow); }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 10px; overflow-x: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--fg); line-height: 1.7; }
+  pre code { background: none; border: none; padding: 0; color: var(--fg); }
+
+  .tip { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; background: rgba(97,175,239,.07); font-size: 13.5px; color: var(--dim); }
+  .tip b { color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--accent); font-size: 12.5px; letter-spacing: .5px; background: rgba(97,175,239,.05); }
+  td:first-child { width: 38%; }
+  tbody tr:hover { background: rgba(189,147,249,.05); }
+  .table-note { font-size: 12.5px; color: var(--dim); margin: 12px 0 6px; }
+  .subhead { font-size: 16px; margin: 26px 0 8px; color: var(--fg); }
+  mark { background: rgba(189,147,249,.35); color: var(--fg); border-radius: 3px; padding: 0 2px; }
+
+  footer { border-top: 1px solid var(--border); padding: 28px 0 40px; text-align: center; color: var(--dim); font-size: 13px; }
+  footer a { color: var(--dim); }
+  footer a:hover { color: var(--accent); }
+
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .sidebar { position: static; max-height: none; overflow: visible; padding: 18px 0; border-right: none; border-bottom: 1px solid var(--border); }
+    .side-title, .side-foot { display: none; }
+    .toc { display: flex; flex-wrap: wrap; gap: 6px; }
+    .toc a { border-left: none; border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; }
+    .toc a.active, .toc a.match { border-color: var(--accent); border-radius: 999px; }
+    .search-box { margin-left: 0; width: 100%; }
+    .search-box input { flex: 1; max-width: none; }
+    nav .wrap { gap: 10px; }
+    .hero h1 { font-size: 29px; }
+    .doc-section { padding-top: 36px; }
+    .flabel { flex-basis: 46px; }
+  }
+  @media (max-width: 560px) {
+    .frow { flex-direction: column; gap: 2px; }
+    .flabel { flex-basis: auto; }
+    th:first-child, td:first-child { width: 48%; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="back" href="index.html">← 返回首页</a>
+    <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
+    <span class="ver-badge">v0.13.0</span>
+    <div class="search-box">
+      <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
+      <span class="search-count" id="search-count"></span>
+    </div>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="side-title">目录 CONTENTS</div>
+    <div class="toc" id="toc">
+      <a href="#sec-files" data-kw="多标签 新建 打开 保存 另存为 最近文件 分类 文件夹树 大文件 外部变更">01 文件与标签</a>
+      <a href="#sec-editing" data-kw="缩放 当前行 段落高亮 空白符 Tab 列编辑 表格 换行">02 编辑体验</a>
+      <a href="#sec-themes" data-kw="8套主题 自定义主题 JSON 导入导出 界面字号 查找框字号">03 主题外观</a>
+      <a href="#sec-find" data-kw="查找替换 跨文件夹 正则 大小写 全词 浮窗 结果面板 F3">04 查找替换</a>
+      <a href="#sec-markdown" data-kw="GFM KaTeX 公式 Mermaid 图表 highlight.js 预览 导出 HTML">05 Markdown</a>
+      <a href="#sec-compare" data-kw="对比 分屏 Diff 语法着色 打印 PDF">06 对比与预览</a>
+      <a href="#sec-annotation" data-kw="划线 高亮 备注 颜色 标注导航">07 标注</a>
+      <a href="#sec-macro" data-kw="录制 回放 宏 保存 导入导出">08 宏</a>
+      <a href="#sec-ai" data-kw="AI 动作 自定义指令 服务商 Key DeepSeek GLM Kimi">09 AI 辅助</a>
+      <a href="#sec-system" data-kw="更新 官网 版本号 会话恢复 布局 拖拽 媒体">10 系统与便捷</a>
+      <a href="#sec-shortcuts" data-kw="快捷键 键位 Ctrl F3 列表">11 快捷键速查表</a>
+    </div>
+    <div class="side-foot">提示：顶部搜索框可实时过滤目录，按 <kbd>Enter</kbd> 跳转到首个匹配章节，<kbd>Esc</kbd> 清空。</div>
+  </aside>
+
+  <main class="content">
+    <header class="hero">
+      <h1>NotePP <em>功能手册</em></h1>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.13.0，适用于 macOS / Windows / Linux / Android。</p>
+      <div class="meta">
+        <span>当前版本 <b>v0.13.0</b></span>
+        <span><b>11</b> 大功能类别</span>
+        <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
+        <span>数据 <b>全部本地存储</b></span>
+      </div>
+    </header>
+
+    <!-- 01 文件与标签 -->
+    <section class="doc-section" id="sec-files">
+      <h2><span class="num">01</span> 📁 文件与标签</h2>
+      <p class="sec-lead">多文件工作流、本地文件库与文件夹浏览，大文件也有对应的轻量方案。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🗂️</span>多标签编辑</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">多个文件同时打开在顶部标签栏，未保存的标签以 <b>●</b> 标记。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><kbd>Ctrl+Tab</kbd> 依次切换标签；中键点击标签直接关闭；也能用菜单「关闭」。</span></div>
+        <div class="path"><span class="badge">路径</span>顶部标签栏 / 菜单栏「关闭」　<span class="badge">快捷键</span><kbd>Ctrl+Tab</kbd><kbd>Ctrl+W</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🆕</span>新建 / 打开 / 保存 / 另存为</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">使用系统原生文件对话框，支持把文件直接拖进窗口打开。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><b>保存</b>覆盖当前文件；<b>另存为</b>可导出到其他路径或编码；大文件只读模式下请用「另存为」导出已加载部分。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「新建 / 打开 / 保存 / 另存为」　<span class="badge">快捷键</span><kbd>Ctrl+N</kbd><kbd>Ctrl+O</kbd><kbd>Ctrl+S</kbd><kbd>Ctrl+Shift+S</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🕘</span>最近文件</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">自动记录最近打开的 <b>10 条</b>文件路径。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单栏右侧「最近文件」下拉框，按文件名或完整路径选择即可再次打开。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏右侧「最近文件」下拉列表</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🗃️</span>文件库与分类管理</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">打开过的文件自动进入文件库，可用带颜色的分类归档。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在左侧分类侧栏<b>新建分类</b>并指定颜色，右键文件<b>归类</b>，可<b>收藏置顶</b>与<b>搜索过滤</b>；所有数据本地持久化。</span></div>
+        <div class="path"><span class="badge">路径</span>左侧分类侧栏　<span class="badge">显隐</span><kbd>Ctrl+B</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🌳</span>文件夹树</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">侧栏内置目录树，方便在项目里逐层浏览。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击侧栏「打开」按钮选择文件夹，逐层展开后直接点击文件打开；隐藏文件自动过滤。</span></div>
+        <div class="path"><span class="badge">路径</span>侧栏「打开」按钮 → 选择文件夹</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📚</span>大文件只读模式</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">超过 <b>8MB</b> 的文件自动以<b>只读分块</b>方式打开，每块 1MB，按需「再加载」，不会一次占满内存。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">状态栏显示「已加载 / 共」大小与继续加载入口。该模式<b>不支持直接保存与插入媒体</b>，可「另存为」导出已加载部分。</span></div>
+        <div class="path"><span class="badge">路径</span>打开大文件后自动进入 · 状态栏显示模式</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔔</span>外部文件变更监听</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">应用会轮询磁盘文件的修改时间（mtime）与大小。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">当文件在外部被其它程序修改时，会给出提示并支持自动重载，避免基于旧内容编辑造成覆盖。</span></div>
+        <div class="path"><span class="badge">路径</span>自动监听，无需手动开启</div>
+      </div>
+    </section>
+
+    <!-- 02 编辑体验 -->
+    <section class="doc-section" id="sec-editing">
+      <h2><span class="num">02</span> ✏️ 编辑体验</h2>
+      <p class="sec-lead">编辑器本色：缩放、高亮、换行与矩形选区，都能按习惯调。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🔠</span>正文缩放（最大 900px）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">正文字号可实时放大到上限 <b>900px</b>，做标题、贴海报、直接打印大字都方便。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><kbd>Ctrl/⌘ + 滚轮</kbd> 缩放，<kbd>Ctrl+0</kbd> 复位 100%。设置里也有基准字号（11–24px）与缩放比例滑块。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 正文字号缩放　<span class="badge">快捷键</span><kbd>Ctrl+滚轮</kbd><kbd>Ctrl+0</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🖊️</span>当前行与当前段落高亮</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">光标所在行 / 整段以醒目底色标出；默认用主题强调色淡染并带左竖条，与标注色系明显区分。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在「设置」中勾选<b>当前行高亮</b>与<b>当前段落高亮</b>，可用取色器<b>自定义高亮颜色</b>，也可一键「跟随主题」。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 当前行高亮 / 当前段落高亮 / 高亮颜色</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">↩️</span>自动换行、空白符与 Tab 宽度</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">长行自动换行、空格与 Tab 可视化、缩进宽度可调，帮助看清排版结构。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">「设置」中勾选<b>自动换行</b>、<b>显示空白符</b>；<b>Tab 宽度</b>可选 2 / 4 / 8 空格；行高也可在 1.2–2.4 之间调节，实时生效并持久化。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 自动换行 / 显示空白符 / Tab 宽度 / 行高</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">▦</span>列编辑（矩形选区）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">开启后拖拽形成矩形选区，多行同时输入同一段文字；遇到短行或空行会自动补空格，保持选区成一条直线。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「列选」开启（按钮高亮），然后按住拖拽；也可直接 <kbd>Alt + 拖拽</kbd> 临时进入列编辑。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「列选」或 <kbd>Alt+拖拽</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📊</span>插入 Markdown 表格</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">一键在光标处插入 GFM 表格模板，免去手写表头分隔行。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">把光标放到目标位置，点击菜单「表格」，随后直接编辑单元格内容即可。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「表格」（需先打开一个文件）</div>
+      </div>
+    </section>
+
+    <!-- 03 主题外观 -->
+    <section class="doc-section" id="sec-themes">
+      <h2><span class="num">03</span> 🎨 主题外观</h2>
+      <p class="sec-lead">8 套内置主题覆盖整个界面，自定义主题用 JSON 描述、导入导出。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🌈</span>8 套内置主题</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">暗色（默认）、亮色、羊皮纸、日光（Solarized）、护眼绿、Nord、Dracula、赛博，共 8 套。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」→「编辑器主题」，点击色块即可切换，正文与配色实时生效。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 编辑器主题</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🧩</span>自定义主题（JSON 导入 / 导出 / 模板）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">主题以 JSON 描述（背景、前景、强调色、段落色等），可增量扩充而不覆盖内置主题。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在主题区点击<b>导出模板</b>获取样例，改好颜色后用<b>导入主题</b>加载；<b>导出我的主题</b>可把自定义主题打包成 JSON 备份或分享。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 编辑器主题 → 导入主题 / 导出我的主题 / 导出模板</div>
+        <pre><code>{
+  "id": "my-theme",
+  "name": "我的主题",
+  "colors": {
+    "bg": "#1e1e2c", "fg": "#e6e6f0",
+    "accent": "#61afef", "para": "#333846"
+  }
+}</code></pre>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🖥️</span>主题覆盖整体界面</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">主题配色与界面字号倍率会注入应用根元素，菜单、侧栏、状态栏、按钮等所有 UI 都随之变化，风格统一。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">「设置」中调整<b>界面字号</b>倍率（70%–200%）影响全局 UI；改主题后无需重启。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 界面字号</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔍</span>查找框字号倍率</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">查找 / 替换浮窗可单独设置字号倍率（70%–200%），在界面倍率基础上叠加，方便演示或大屏阅读。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">「设置」→「查找框字号」拖动滑块；设置即时反映到浮窗。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 查找框字号</div>
+      </div>
+    </section>
+
+    <!-- 04 查找替换 -->
+    <section class="doc-section" id="sec-find">
+      <h2><span class="num">04</span> 🔎 查找替换</h2>
+      <p class="sec-lead">单文件、跨文件夹与所有标签页三种范围，Notepad++ 风格结果面板。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🔤</span>当前文件查找</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">实时高亮<b>全部命中</b>，当前命中单独标色，并显示 n/N 命中计数。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><kbd>Ctrl+F</kbd> 打开查找；<kbd>Ctrl+H</kbd> 打开并聚焦替换框；在查找框内 <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> 跳下一处 / 上一处；<kbd>Esc</kbd> 关闭。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「查找」　<span class="badge">快捷键</span><kbd>Ctrl+F</kbd><kbd>Ctrl+H</kbd><kbd>Esc</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🗂️</span>跨文件夹 / 所有打开标签查找</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">查找范围可选：当前文件、整个文件夹、或所有已打开的标签页。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在查找面板选择范围并输入关键字，匹配结果汇总到窗口底部的<b>结果面板</b>。</span></div>
+        <div class="path"><span class="badge">路径</span>查找面板 → 选择搜索范围</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">⚙️</span>匹配选项与替换</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">支持<b>正则</b>、<b>区分大小写</b>、<b>全词匹配</b>三种选项；替换可逐个进行或<b>全部替换</b>（可撤销）。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在查找 / 替换浮窗勾选所需选项，填入替换文本，点「替换」或「全部替换」。</span></div>
+        <div class="path"><span class="badge">路径</span>查找浮窗 → 选项与替换按钮</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🪟</span>可拖动的查找浮窗</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">查找浮窗可从主窗口拖出，放到副屏使用；字号可通过「查找框字号」倍率单独调整。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">按住浮窗标题栏拖动即可脱离主窗口；拖回窗口区域可重新停靠。</span></div>
+        <div class="path"><span class="badge">路径</span>查找浮窗标题栏（拖动）· 字号见「设置 → 查找框字号」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📋</span>Notepad++ 风格结果面板</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">底部结果面板按 <b>行号 + 命中行内容</b> 展示，命中词高亮，点击任意结果直接跳转到对应行。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">执行跨文件夹 / 全部标签查找后自动出现；用 <kbd>F3</kbd> / <kbd>Shift+F3</kbd> 在命中间循环。</span></div>
+        <div class="path"><span class="badge">路径</span>查找后面板底部显示　<span class="badge">快捷键</span><kbd>F3</kbd><kbd>Shift+F3</kbd></div>
+      </div>
+    </section>
+
+    <!-- 05 Markdown -->
+    <section class="doc-section" id="sec-markdown">
+      <h2><span class="num">05</span> 📝 Markdown</h2>
+      <p class="sec-lead">完整 GFM 加数学、图表与代码高亮，写完可直接预览、导出。</p>
+
+      <div class="feature">
+        <h3><span class="ic">📄</span>完整 GFM 支持</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">标题、列表、任务列表、表格、引用、链接、围栏代码块等 GitHub Flavored Markdown 语法。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">像普通文本一样编辑 <code>.md</code> 文件，点击「预览」即可看到渲染效果。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「预览」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">∑</span>KaTeX 数学公式</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">支持 LaTeX 语法的数学公式渲染，行内与块级均可。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">行内公式用 <code>$...$</code>，独立公式用 <code>$$...$$</code>，在预览中查看排版结果。</span></div>
+        <div class="path"><span class="badge">路径</span>Markdown 正文 → 预览</div>
+        <pre><code>行内：$ E = mc^2 $
+块级：
+$$
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+$$</code></pre>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📊</span>Mermaid 图表</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">在 Markdown 中用 Mermaid 代码块描述流程图、时序图等，预览时渲染成图。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">使用 <code>```mermaid</code> 围栏代码块写入图表定义。</span></div>
+        <div class="path"><span class="badge">路径</span>Markdown 正文 → 预览</div>
+        <pre><code>```mermaid
+graph LR
+  A[写笔记] --&gt; B(预览)
+  B --&gt; C[导出 HTML]
+```</code></pre>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🖍️</span>highlight.js 代码高亮</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">围栏代码块按语言着色，编辑器内还支持 25+ 语言（JS/TS/Python/Rust/Go/SQL 等）按扩展名识别。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在代码围栏后标注语言名，如 <code>```python</code>，预览时自动高亮。</span></div>
+        <div class="path"><span class="badge">路径</span>Markdown 正文 → 预览</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">👁️</span>渲染预览与导出带样式 HTML</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">所见即所得的渲染预览；非 Markdown 文件按纯文本预览；支持导出保留样式的 HTML。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「预览」打开预览面板，从中导出 HTML，或直接打印成 PDF。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「预览」→ 导出带样式 HTML</div>
+      </div>
+    </section>
+
+    <!-- 06 对比与预览 -->
+    <section class="doc-section" id="sec-compare">
+      <h2><span class="num">06</span> ⚖️ 对比与预览</h2>
+      <p class="sec-lead">分屏查看、双文件逐行 Diff，以及打印 / 导出 PDF。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🪟</span>分屏对照</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">左右两栏同时查看两个文件，适合并排核对。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「分屏」（按钮高亮）开启，再次点击关闭。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「分屏」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔀</span>双文件对比对话框</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">从已打开标签或磁盘选择两个文件，进入左右分栏 Diff 视图：删除 / 新增高亮，未变化区域自动折叠。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「对比」，在对话框中选择两个文件后确认。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「对比」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔬</span>逐行对比与渲染预览双模式</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">对比视图提供两种模式：<b>逐行对比</b>（带语法着色）看文本差异，<b>渲染预览</b>看最终呈现效果。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在对比 / 预览面板中切换模式，按需查看代码级差异或文档级效果。</span></div>
+        <div class="path"><span class="badge">路径</span>对比视图 / 预览面板的模式切换</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🖨️</span>打印 / 导出 PDF</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">按当前缩放字号打印文档，在系统打印对话框里选择「另存为 PDF」即可导出。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「打印」或按 <kbd>Ctrl+P</kbd>，在打印目的地中选 PDF。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「打印」　<span class="badge">快捷键</span><kbd>Ctrl+P</kbd></div>
+      </div>
+    </section>
+
+    <!-- 07 标注 -->
+    <section class="doc-section" id="sec-annotation">
+      <h2><span class="num">07</span> 🖍️ 标注</h2>
+      <p class="sec-lead">划线、高亮、备注随文字自动位移，按文件持久化。</p>
+
+      <div class="feature">
+        <h3><span class="ic">✏️</span>划线 / 高亮 / 备注</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">给选中文字添加<b>高亮</b>、<b>下划线</b>或<b>备注</b>；备注在悬停标注文字时显示。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在编辑器中选中文字 → 右键 →「标注」，选择颜色 / 下划线 / 写备注。标注随编辑自动位移，并按文件路径持久化。</span></div>
+        <div class="path"><span class="badge">路径</span>选中文字右键 → 标注</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🎨</span>高亮颜色选择</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 5 色高亮色板：<b>黄、绿、蓝、粉、橙</b>。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在标注右键菜单中点击对应色块即可给选中文字上色。</span></div>
+        <div class="path"><span class="badge">路径</span>选中文字右键 → 标注 → 色板</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📋</span>标注导航面板</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">列出当前文件的所有划线 / 高亮 / 备注，点击条目跳转到对应位置。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「标注」（按钮高亮）打开导航面板，从列表中快速定位；读书、审稿、Code Review 都适用。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「标注」</div>
+      </div>
+    </section>
+
+    <!-- 08 宏 -->
+    <section class="doc-section" id="sec-macro">
+      <h2><span class="num">08</span> 🎬 宏</h2>
+      <p class="sec-lead">把一串编辑动作录下来，一键重放，重复操作省事。</p>
+
+      <div class="feature">
+        <h3><span class="ic">⏺️</span>录制宏</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">录制输入文本与按键动作；录制时按钮变为「停止录制 ●N」并实时显示动作数。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><kbd>Ctrl+Shift+R</kbd> 开始 / 停止录制，或点击菜单「录制宏」。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「录制宏」　<span class="badge">快捷键</span><kbd>Ctrl+Shift+R</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">▶️</span>回放宏</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">按顺序重放已录制的动作；尚未录制时按钮不可用。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><kbd>Ctrl+Shift+P</kbd> 回放，或点击菜单「回放宏」。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「回放宏」　<span class="badge">快捷键</span><kbd>Ctrl+Shift+P</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">💾</span>宏管理：保存 / 回放 / 重命名 / 删除</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">把当前录制的动作保存为「命名宏」，永久保留（存于本机），可随时按名称回放，也可重命名或删除。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">先「录制宏」并停止录制 → 点菜单「宏管理」→ 在顶部输入名字并保存。之后在列表点宏名（▶）即可从当前光标处回放。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「宏管理」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📦</span>宏的导入 / 导出</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">所有命名宏可一键导出为一个 JSON 文件备份，或从 JSON 文件导入，方便跨设备迁移与分享。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在「宏管理」弹窗右上点「📤 导出」下载 JSON；点「📥 导入」选择文件即可合并进来（按宏 ID 去重）。不确定格式时先点「📄 示例」下载示例文件照着改。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「宏管理」→ 导入 / 导出 / 示例</div>
+      </div>
+
+      <div class="tip"><b>提示：</b>宏动作支持文本输入与常见按键（Enter、Tab、Backspace、方向键等）；录制时会自动排除应用级快捷键，避免误录。</div>
+    </section>
+
+    <!-- 09 AI 辅助 -->
+    <section class="doc-section" id="sec-ai">
+      <h2><span class="num">09</span> 🤖 AI 辅助</h2>
+      <p class="sec-lead">选中文本右键调用 AI，多厂商配置直连，流式输出。</p>
+
+      <div class="feature">
+        <h3><span class="ic">✨</span>AI 动作（选中文本右键触发）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 7 个动作：<b>解释这段内容、润色改写、提炼要点、翻译成中文、翻译成英文、生成代码注释、自定义指令…</b>；回复流式显示，关闭弹窗即可取消。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在编辑器中选中文字 → 右键 → 选择 AI 动作；结果可<b>复制</b>、<b>插入光标处</b>或<b>替换原文</b>。</span></div>
+        <div class="path"><span class="badge">路径</span>选中文本右键 → AI 动作</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">✍️</span>自定义动作</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置动作之外，可自己描述要 AI 做什么。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">右键 →「自定义指令…」，在输入框写下指令后发送。</span></div>
+        <div class="path"><span class="badge">路径</span>选中文本右键 → 自定义指令…</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔑</span>AI 服务商与 Key 配置</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 DeepSeek、Agnes AI、商汤日日新 SenseNova、智谱 GLM、月之暗面 Kimi、通义千问、OpenAI、OpenRouter、Ollama 本地及自定义 OpenAI 兼容网关；各厂商 Key 独立保存、随时切换，支持「拉取模型列表」。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">菜单「AI」打开配置，选服务商、填 API Key 与模型；配置可<b>导出 / 导入 JSON</b>。请求由应用直连所选厂商服务器，无额外遥测，文件与标注均在本地。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「AI」→ 服务商与 Key 配置</div>
+      </div>
+    </section>
+
+    <!-- 10 系统与便捷 -->
+    <section class="doc-section" id="sec-system">
+      <h2><span class="num">10</span> ⚙️ 系统与便捷功能</h2>
+      <p class="sec-lead">更新、官网、会话恢复与窗口布局，细节也顺手。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🔄</span>检查更新（不自动更新）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">应用启动时检查最新版本；发现新版本时菜单「更新」按钮高亮提示。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「更新」查看更新说明并跳转下载页。<b>只提示不自动安装</b>——装不装、什么时候装完全由你决定。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「更新」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🌐</span>访问官网入口</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置官网快捷入口 <code>notepp.ambook.vip</code>。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「我的网站」，在系统默认浏览器中打开官网。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「我的网站」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🏷️</span>版本号显示</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.13.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">💾</span>会话恢复</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">重启应用后自动还原上次打开的标签页，接着上次的工作继续。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">无需设置，重新打开应用即自动恢复。</span></div>
+        <div class="path"><span class="badge">路径</span>自动生效</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🧱</span>窗口布局（侧栏 / 文件列表显隐）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">三栏布局：左侧分类侧栏 + 中间文件列表 + 右侧编辑器；面板间拖动条可调宽度，双击复位。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><kbd>Ctrl+B</kbd> 折叠 / 展开侧栏，<kbd>Ctrl+Shift+B</kbd> 折叠 / 展开文件列表；显隐与宽度均持久化。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「侧栏」/「列表」　<span class="badge">快捷键</span><kbd>Ctrl+B</kbd><kbd>Ctrl+Shift+B</kbd></div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🖼️</span>拖拽媒体文件按引用插入</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">图片 / 音频 / 视频拖进窗口后，自动复制到文档旁的 <code>media/</code> 目录并插入引用，笔记与素材放在一起。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">把媒体文件直接拖到编辑器中即可；大文件只读模式下不支持插入媒体，会给出提示。</span></div>
+        <div class="path"><span class="badge">路径</span>拖放媒体文件到编辑器</div>
+      </div>
+    </section>
+
+    <!-- 11 快捷键 -->
+    <section class="doc-section" id="sec-shortcuts">
+      <h2><span class="num">11</span> ⌨️ 快捷键速查表</h2>
+      <p class="sec-lead">下表核心键位整理自项目 README；补充键位来自官网与源码。macOS 上请把 <kbd>Ctrl</kbd> 换成 <kbd>⌘</kbd>。</p>
+
+      <h3 class="subhead">核心快捷键（README）</h3>
+      <table>
+        <thead><tr><th>快捷键</th><th>功能</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl/Cmd + N</kbd></td><td>新建文件</td></tr>
+          <tr><td><kbd>Ctrl/Cmd + O</kbd></td><td>打开文件</td></tr>
+          <tr><td><kbd>Ctrl/Cmd + S</kbd></td><td>保存</td></tr>
+          <tr><td><kbd>Ctrl/Cmd + Shift + S</kbd></td><td>另存为</td></tr>
+          <tr><td><kbd>Ctrl/Cmd + F</kbd></td><td>查找替换</td></tr>
+          <tr><td><kbd>Ctrl/Cmd + W</kbd></td><td>关闭标签</td></tr>
+          <tr><td><kbd>Ctrl + Tab</kbd></td><td>切换标签</td></tr>
+          <tr><td><kbd>Ctrl + Shift + R</kbd></td><td>录制宏 / 停止录制</td></tr>
+          <tr><td><kbd>Ctrl + Shift + P</kbd></td><td>回放宏</td></tr>
+          <tr><td><kbd>Ctrl + B</kbd></td><td>显示 / 隐藏侧栏</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="subhead">补充键位（官网 / 源码核实）</h3>
+      <table>
+        <thead><tr><th>快捷键</th><th>功能</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl/Cmd + Shift + S</kbd></td><td>另存为（同核心表）</td></tr>
+          <tr><td><kbd>Ctrl/Cmd + H</kbd></td><td>打开查找并聚焦替换框</td></tr>
+          <tr><td><kbd>Ctrl + Shift + B</kbd></td><td>显示 / 隐藏文件列表</td></tr>
+          <tr><td><kbd>Ctrl + 滚轮</kbd> / <kbd>Ctrl + 0</kbd></td><td>缩放正文 / 复位到 100%</td></tr>
+          <tr><td><kbd>Ctrl + P</kbd></td><td>打印 / 导出 PDF</td></tr>
+          <tr><td><kbd>F3</kbd> / <kbd>Shift + F3</kbd></td><td>下一处 / 上一处命中</td></tr>
+          <tr><td><kbd>Enter</kbd> / <kbd>Shift + Enter</kbd></td><td>查找框内：下一处 / 上一处</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>关闭查找浮窗</td></tr>
+          <tr><td><kbd>Alt + 拖拽</kbd></td><td>临时进入列编辑（矩形选区）</td></tr>
+          <tr><td>中键点击标签</td><td>关闭该标签</td></tr>
+        </tbody>
+      </table>
+
+      <div class="tip"><b>说明：</b>所有快捷键在 macOS 上将 <kbd>Ctrl</kbd> 替换为 <kbd>⌘ / Cmd</kbd>；菜单按钮的悬浮提示（title）中也标注了对应键位，可随时对照。</div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>NotePP · 轻量跨平台文本编辑器 · <a href="index.html">返回首页</a> · <a href="https://github.com/tomuchgold/noteapp" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/tomuchgold/noteapp/releases" target="_blank" rel="noopener">Releases</a></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var input = document.getElementById('manual-search');
+  var count = document.getElementById('search-count');
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.doc-section'));
+
+  function norm(s) { return (s || '').toLowerCase().trim(); }
+
+  function applyFilter() {
+    var q = norm(input.value);
+    var n = 0;
+    links.forEach(function (a) {
+      var hay = norm(a.textContent + ' ' + (a.getAttribute('data-kw') || ''));
+      var hit = q !== '' && hay.indexOf(q) !== -1;
+      a.classList.toggle('filtered', q !== '' && !hit);
+      a.classList.toggle('match', hit);
+      if (hit) n++;
+    });
+    sections.forEach(function (sec) {
+      var hit = q !== '' && norm(sec.textContent).indexOf(q) !== -1;
+      sec.classList.toggle('search-hit', hit);
+    });
+    count.textContent = q === '' ? '' : (n + ' 个匹配');
+  }
+
+  input.addEventListener('input', applyFilter);
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var first = links.filter(function (a) { return !a.classList.contains('filtered'); })[0];
+      if (first) {
+        var target = document.querySelector(first.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } else if (e.key === 'Escape') {
+      input.value = '';
+      applyFilter();
+      input.blur();
+    }
+  });
+
+  // 滚动时高亮当前章节目录项
+  if ('IntersectionObserver' in window) {
+    var visible = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { visible[en.target.id] = en.isIntersecting; });
+      var current = null;
+      sections.forEach(function (sec) { if (visible[sec.id]) current = sec.id; });
+      if (current) {
+        links.forEach(function (a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+        });
+      }
+    }, { rootMargin: '-70px 0px -60% 0px', threshold: 0 });
+    sections.forEach(function (sec) { io.observe(sec); });
+  }
+})();
+</script>
+
+</body>
+</html>

@@ -16,6 +16,10 @@ import PreviewDialog from "./components/PreviewDialog";
 import FindBar from "./components/FindBar";
 import SearchResults from "./components/SearchResults";
 import AnnoPanel from "./components/AnnoPanel";
+import MacroDialog from "./components/MacroDialog";
+import {
+  addMacro, deleteMacro, exportMacros, importMacros, loadMacros, renameMacro, type SavedMacro,
+} from "./lib/macros";
 import { printDocument } from "./lib/print";
 import {
   applyCase,
@@ -139,6 +143,8 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [macroLen, setMacroLen] = useState(0);
   const macroRef = useRef<MacroItem[]>([]);
+  const [macroDialogOpen, setMacroDialogOpen] = useState(false);
+  const [savedMacros, setSavedMacros] = useState<SavedMacro[]>(() => loadMacros());
   const actionCount = useRef(0);
   const sessionLoaded = useRef(false);
 
@@ -1036,15 +1042,46 @@ export default function App() {
     }
   }, [recording]);
 
-  const replayMacro = useCallback(() => {
-    if (recording || macroRef.current.length === 0) return;
+  const playItems = useCallback((items: MacroItem[]) => {
+    if (recording || !items.length) return;
     actionCount.current += 1;
-    setActionSignal({
-      type: "macro-replay",
-      n: actionCount.current,
-      items: [...macroRef.current],
-    });
+    setActionSignal({ type: "macro-replay", n: actionCount.current, items: [...items] });
   }, [recording]);
+
+  const replayMacro = useCallback(() => {
+    playItems(macroRef.current);
+  }, [playItems]);
+
+  // ---------- 命名宏：保存 / 回放 / 管理 / 导入导出 ----------
+  const handleSaveMacro = useCallback((name: string, items: MacroItem[]) => {
+    setSavedMacros(addMacro(name, items));
+  }, []);
+  const handleDeleteMacro = useCallback((id: string) => setSavedMacros(deleteMacro(id)), []);
+  const handleRenameMacro = useCallback((id: string, name: string) => setSavedMacros(renameMacro(id, name)), []);
+  const handleImportMacros = useCallback((json: string) => setSavedMacros(importMacros(json)), []);
+  const handleExportMacros = useCallback(() => {
+    const blob = new Blob([exportMacros()], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notepp-macros.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, []);
+  const handleMacroTemplate = useCallback(() => {
+    const sample = {
+      format: "notepp-macros", version: 1,
+      macros: [
+        { name: "示例：输入问候", items: [{ type: "text", text: "Hello, NotePP!" }] },
+        { name: "示例：空两行", items: [{ type: "cmd", cmd: "Enter" }, { type: "cmd", cmd: "Enter" }] },
+      ],
+    };
+    const blob = new Blob([JSON.stringify(sample, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notepp-macros-example.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, []);
 
   // 录制中捕获按键（排除应用级快捷键与纯修饰键）
   useEffect(() => {
@@ -1279,6 +1316,12 @@ export default function App() {
           title={`回放宏 (Ctrl+Shift+P)${macroLen ? `，共 ${macroLen} 个动作` : "，尚未录制"}`}
         >
           回放宏
+        </button>
+        <button
+          onClick={() => setMacroDialogOpen(true)}
+          title="宏管理：保存当前录制为命名宏、回放/重命名/删除、导入导出 JSON"
+        >
+          宏管理
         </button>
         <button
           onClick={() => patchLayout({ sidebarOpen: !layout.sidebarOpen })}
@@ -1686,6 +1729,21 @@ export default function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
+
+      {/* 宏管理弹窗 */}
+      <MacroDialog
+        open={macroDialogOpen}
+        macros={savedMacros}
+        liveItems={macroRef.current}
+        onClose={() => setMacroDialogOpen(false)}
+        onSave={handleSaveMacro}
+        onReplay={playItems}
+        onDelete={handleDeleteMacro}
+        onRename={handleRenameMacro}
+        onImport={handleImportMacros}
+        onExport={handleExportMacros}
+        onImportTemplate={handleMacroTemplate}
+      />
 
       {/* 插入表格 */}
       {tableOpen && (
