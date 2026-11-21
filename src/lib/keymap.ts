@@ -37,6 +37,13 @@ export const BUILTIN_COMMANDS: CommandDef[] = [
   { id: "newtab", name: "新建文件", category: "文件", defaultKey: "Ctrl+N", desc: "新建一个标签页" },
   { id: "record-macro", name: "录制宏", category: "宏与片段", defaultKey: "Ctrl+Shift+R", desc: "开始/停止录制宏" },
   { id: "replay-macro", name: "回放宏", category: "宏与片段", defaultKey: "Ctrl+Shift+P", desc: "回放当前录制的宏" },
+  { id: "transform-upper", name: "转为大写", category: "编辑插入", defaultKey: "Ctrl+Alt+U", desc: "把选中文字（无选中则当前行）转成大写" },
+  { id: "transform-lower", name: "转为小写", category: "编辑插入", defaultKey: "Ctrl+Alt+I", desc: "把选中文字（无选中则当前行）转成小写" },
+  { id: "transform-title", name: "首字母大写", category: "编辑插入", defaultKey: "", desc: "把选中英文每个单词首字母大写（无选中则当前行）" },
+  { id: "transform-sort", name: "行排序 A→Z", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）按字典序升序排序" },
+  { id: "transform-sort-desc", name: "行排序 Z→A", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）按字典序降序排序" },
+  { id: "transform-dedupe", name: "去除重复行", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）去除相邻重复之外的重复行" },
+  { id: "transform-trim", name: "去除行首尾空格", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）去掉每行首尾的空白" },
 ];
 
 const KEY = "notepp.keymap-bindings";

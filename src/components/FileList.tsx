@@ -13,6 +13,10 @@ interface Props {
   onAssign: (path: string, category: string | null) => void;
   onRemove: (path: string) => void;
   onNewFile: () => void;
+  /** 打开文件所在文件夹（设为侧栏目录树根） */
+  onOpenFolderOf: (path: string) => void;
+  /** 在系统文件管理器中定位该文件 */
+  onReveal: (path: string) => void;
 }
 
 export default function FileList({
@@ -27,6 +31,8 @@ export default function FileList({
   onAssign,
   onRemove,
   onNewFile,
+  onOpenFolderOf,
+  onReveal,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
 
@@ -116,6 +122,24 @@ export default function FileList({
           style={{ left: Math.min(menu.x, window.innerWidth - 190), top: menu.y }}
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            className="ctx-item"
+            onClick={() => {
+              onOpenFolderOf(menu.path);
+              setMenu(null);
+            }}
+          >
+            📂 打开所在文件夹
+          </button>
+          <button
+            className="ctx-item"
+            onClick={() => {
+              void onReveal(menu.path);
+              setMenu(null);
+            }}
+          >
+            🖥️ 在系统中显示
+          </button>
           <div className="ctx-title">移动到分类</div>
           <button
             className="ctx-item"

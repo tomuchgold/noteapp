@@ -642,6 +642,7 @@ export default function App() {
 
   // ---------- 标注导航面板 ----------
   const [annoOpen, setAnnoOpen] = useState(false);
+  const [transformOpen, setTransformOpen] = useState(false);
   /** 点击标注列表项 → 跳到标注位置 */
   const jumpToAnnotation = useCallback((ann: Annotation) => {
     gotoSeq.current += 1;
@@ -671,6 +672,12 @@ export default function App() {
     const tok = commentTokens(activeTab?.path ?? activeTab?.name ?? null);
     insertText(block ? `${tok.blockStart}注释内容${tok.blockEnd}` : `${tok.line}注释内容${tok.lineEnd ?? ""}`);
   }, [insertText, activeTab]);
+
+  /** 文字变换：upper / lower / title / sort / sort-desc / dedupe / trim */
+  const runTransform = useCallback((kind: string) => {
+    actionCount.current += 1;
+    setActionSignal({ type: "transform", n: actionCount.current, text: kind });
+  }, []);
 
   const activeIsMarkdown = !!activeTab && (/\.(md|markdown)$/i.test(activeTab.name) || /\.(md|markdown)$/i.test(activeTab.path ?? ""));
   void activeIsMarkdown; // 预览按钮对所有文档开放；保留标记供状态提示使用
@@ -882,13 +889,28 @@ export default function App() {
   }, []);
 
   /** 在系统文件管理器中定位 */
+  /** 在系统中显示（文件管理器里定位） */
   const revealTreePath = useCallback(async (p: string) => {
+    if (!p) return;
     try {
       await revealInOS(p);
     } catch (e) {
       alert(`定位失败：${e}`);
     }
   }, []);
+
+  /** 取路径的父目录（兼容 / 与 \） */
+  const dirnameOf = useCallback((p: string) => {
+    const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+    return i > 0 ? p.slice(0, i) : p;
+  }, []);
+
+  /** 打开某文件/目录所在的文件夹（设为侧栏目录树根） */
+  const openFolderOf = useCallback((p: string | null | undefined) => {
+    if (!p) return;
+    const dir = dirnameOf(p);
+    if (dir) setFolderRoot(dir);
+  }, [dirnameOf]);
 
   /** 递归收集目录下的文本文件（上限 200，深度 5） */
   const collectTextFiles = async (dir: string, acc: string[], depth = 0): Promise<string[]> => {
@@ -1422,11 +1444,19 @@ export default function App() {
       case "newtab": newTab(); break;
       case "record-macro": toggleRecord(); break;
       case "replay-macro": replayMacro(); break;
+      case "transform-upper": runTransform("upper"); break;
+      case "transform-lower": runTransform("lower"); break;
+      case "transform-title": runTransform("title"); break;
+      case "transform-sort": runTransform("sort"); break;
+      case "transform-sort-desc": runTransform("sort-desc"); break;
+      case "transform-dedupe": runTransform("dedupe"); break;
+      case "transform-trim": runTransform("trim"); break;
       default: break;
     }
   }, [
     savedMacros, playItems, snippets, insertText, insertDateTime, insertComment,
     openFind, stepFind, toggleSplit, doPrint, activeTab, saveTab, newTab, toggleRecord, replayMacro,
+    runTransform,
   ]);
 
   // ---------- 快捷键（自定义绑定优先 + 内置兜底） ----------
@@ -1603,11 +1633,12 @@ export default function App() {
       : "NotePP";
   }, [activeTab]);
 
-  // 全局点击关闭右键菜单
+  // 全局点击关闭右键菜单 / 变换下拉
   useEffect(() => {
     const hide = () => {
       const menu = document.getElementById("tab-context-menu");
       if (menu) menu.style.display = "none";
+      setTransformOpen(false);
     };
     window.addEventListener("click", hide);
     window.addEventListener("blur", hide);
@@ -1624,81 +1655,119 @@ export default function App() {
     <div className="app">
       {/* 菜单栏 */}
       <div className="menubar">
-        <button onClick={newTab}>新建</button>
-        <button onClick={openDialog}>打开</button>
-        <button onClick={() => activeTab && saveTab(activeTab)}>保存</button>
-        <button onClick={() => activeTab && saveTab(activeTab, true)}>另存为</button>
-        <button onClick={() => setDiffDialog(true)}>对比</button>
+        <button onClick={newTab} title="新建空白标签 (Ctrl+N)">📄 新建</button>
+        <button onClick={openDialog} title="打开文件">📂 打开</button>
+        <button onClick={() => activeTab && saveTab(activeTab)} title="保存 (Ctrl+S)">💾 保存</button>
+        <button onClick={() => activeTab && saveTab(activeTab, true)} title="另存为 (Ctrl+Shift+S)">📥 另存为</button>
+        <button onClick={() => setDiffDialog(true)} title="两个文件逐行对比">🔀 对比</button>
         <button onClick={() => openFind()} title="查找替换 (Ctrl+F，F3 下一处，Shift+F3 反向)">
-          查找
+          🔍 查找
         </button>
         <button
           onClick={() => insertDateTime("datetime")}
           disabled={!activeTab}
           title="插入当前日期时间 (Ctrl+Alt+D)"
         >
-          时间
+          🕐 时间
         </button>
         <button
           onClick={() => insertComment(false)}
           disabled={!activeTab}
           title="按当前文件类型插入行注释 (Ctrl+Alt+C)"
         >
-          注释
+          💬 注释
         </button>
-        <button onClick={() => activeId && closeTab(activeId)}>关闭</button>
+        <span className="menu-drop-wrap">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setTransformOpen((v) => !v);
+            }}
+            disabled={!activeTab}
+            className={transformOpen ? "on" : ""}
+            title="文字变换：大小写转换、行排序、去重、去行首尾空格"
+          >
+            🔠 变换 ▾
+          </button>
+          {transformOpen && (
+            <div className="context-menu transform-menu" onClick={(e) => e.stopPropagation()}>
+              {[
+                { id: "transform-upper", label: "转为大写" },
+                { id: "transform-lower", label: "转为小写" },
+                { id: "transform-title", label: "首字母大写" },
+                { id: "transform-sort", label: "行排序 A→Z" },
+                { id: "transform-sort-desc", label: "行排序 Z→A" },
+                { id: "transform-dedupe", label: "去除重复行" },
+                { id: "transform-trim", label: "去除行首尾空格" },
+              ].map((it) => (
+                <button
+                  key={it.id}
+                  onClick={() => {
+                    setTransformOpen(false);
+                    executeCommand(it.id);
+                  }}
+                  title={BUILTIN_COMMANDS.find((c) => c.id === it.id)?.desc}
+                >
+                  {it.label}
+                  {shortcutOf(it.id) && <span className="menu-key"> {shortcutOf(it.id)}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </span>
+        <button onClick={() => activeId && closeTab(activeId)} title="关闭当前标签 (Ctrl+W)">✖️ 关闭</button>
         <button
           onClick={toggleRecord}
           className={recording ? "rec-active" : ""}
           title="录制编辑动作 (Ctrl+Shift+R)"
         >
-          {recording ? `停止录制 ●${macroLen}` : "录制宏"}
+          {recording ? `⏺️ 停止录制 ●${macroLen}` : "⏺️ 录制宏"}
         </button>
         <button
           onClick={replayMacro}
           disabled={recording || macroLen === 0}
           title={`回放宏 (Ctrl+Shift+P)${macroLen ? `，共 ${macroLen} 个动作` : "，尚未录制"}`}
         >
-          回放宏
+          回放宏 ▶️
         </button>
         <button
           onClick={() => setMacroDialogOpen(true)}
           title="宏管理：保存当前录制为命名宏、回放/重命名/删除、导入导出 JSON"
         >
-          宏管理
+          📜 宏管理
         </button>
         <button
           onClick={() => setSnippetDialogOpen(true)}
           title="片段/模板管理：输入缩写后按 Tab 展开，支持 ${NOW}/${DATE}/${TIME}"
         >
-          片段
+          🧩 片段
         </button>
         <button
           onClick={() => openKeymapFor()}
           title="快捷键设置：内置命令、宏、片段均可自定义按键"
         >
-          快捷键
+          ⌨️ 快捷键
         </button>
         <button
           onClick={() => patchLayout({ sidebarOpen: !layout.sidebarOpen })}
           className={layout.sidebarOpen ? "on" : ""}
           title="显示/隐藏侧栏 (Ctrl+B)"
         >
-          侧栏
+          🗂️ 侧栏
         </button>
         <button
           onClick={() => patchLayout({ filelistOpen: !layout.filelistOpen })}
           className={layout.filelistOpen ? "on" : ""}
           title="显示/隐藏文件列表 (Ctrl+Shift+B)"
         >
-          列表
+          📋 列表
         </button>
         <button
           onClick={() => setTableOpen(true)}
           disabled={!activeTab}
           title="在光标处插入 Markdown 表格"
         >
-          表格
+          📊 表格
         </button>
         <button
           onClick={() => setPreviewOpen(true)}
@@ -1706,7 +1775,7 @@ export default function App() {
           className={previewOpen ? "on" : ""}
           title="Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览"
         >
-          预览
+          👁️ 预览
         </button>
         <button
           onClick={doPrint}
@@ -1714,7 +1783,7 @@ export default function App() {
           className="menubar-secondary"
           title="打印 / 导出 PDF（按当前缩放字号；打印对话框里选「另存为 PDF」）"
         >
-          打印
+          🖨️ 打印
         </button>
         <button
           onClick={() => setAnnoOpen((v) => !v)}
@@ -1722,24 +1791,24 @@ export default function App() {
           className={annoOpen ? "on" : ""}
           title="标注导航：当前文件所有划线/高亮/备注列表，点击跳转"
         >
-          标注
+          🖍️ 标注
         </button>
         <button
           onClick={toggleSplit}
           className={splitId ? "on" : ""}
           title="分屏对照：左右同时查看两个文件（再次点击关闭）"
         >
-          分屏
+          ↔️ 分屏
         </button>
-        <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置">
-          设置
+        <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置：字号/主题/行高/高亮颜色等">
+          ⚙️ 设置
         </button>
         <button
           onClick={() => setColumnMode((v) => !v)}
           className={columnMode ? "on" : ""}
           title="列编辑模式：矩形选区 + 十字光标（Alt+拖拽也可多行同时编辑）"
         >
-          列选
+          ▦ 列选
         </button>
         <button
           onClick={() => {
@@ -1749,21 +1818,21 @@ export default function App() {
           className={updateInfo?.newer ? "on" : ""}
           title={updateInfo?.newer ? `发现新版本 v${updateInfo.latest}` : "检查更新"}
         >
-          更新
+          🔄 更新
         </button>
         <button
           onClick={() => setAiSettingsOpen(true)}
           className={aiReady ? "on" : ""}
           title={aiReady ? `AI 已就绪：${resolveConfig(aiConfig).model}` : "配置 AI 服务商与 Key"}
         >
-          AI
+          🤖 AI
         </button>
         <button
           className="menubar-secondary"
           onClick={() => void openUrl("https://notepp.ambook.vip")}
           title="访问官网 notepp.ambook.vip（在系统浏览器中打开）"
         >
-          我的网站
+          🌐 我的网站
         </button>
         <span className="spacer" />
         {recent.length > 0 && (
@@ -1825,6 +1894,7 @@ export default function App() {
               onDelete={deleteTreePath}
               onReveal={revealTreePath}
               onOpenAll={openAllInDir}
+              onOpenFolderOf={openFolderOf}
             />
           </Sidebar>
         )}
@@ -1853,6 +1923,8 @@ export default function App() {
             onAssign={assignCategory}
             onRemove={removeFromLibrary}
             onNewFile={newTab}
+            onOpenFolderOf={openFolderOf}
+            onReveal={revealTreePath}
           />
         )}
         {layout.filelistOpen && (
@@ -2284,6 +2356,26 @@ export default function App() {
           }}
         >
           关闭其他
+        </button>
+        <button
+          onClick={() => {
+            const menu = document.getElementById("tab-context-menu");
+            const t = tabs.find((x) => x.id === menu?.dataset.tabId);
+            if (t?.path) openFolderOf(t.path);
+            menu!.style.display = "none";
+          }}
+        >
+          📂 打开所在文件夹
+        </button>
+        <button
+          onClick={() => {
+            const menu = document.getElementById("tab-context-menu");
+            const t = tabs.find((x) => x.id === menu?.dataset.tabId);
+            if (t?.path) void revealTreePath(t.path);
+            menu!.style.display = "none";
+          }}
+        >
+          🖥️ 在系统中显示
         </button>
       </div>
     </div>

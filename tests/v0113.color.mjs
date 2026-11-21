@@ -44,7 +44,7 @@ const getVar = () =>
   page.evaluate(() => document.querySelector(".editor-host")?.style.getPropertyValue("--np-para") || "");
 
 // 打开设置
-await page.locator('.menubar button[title="编辑器样式设置"]').click();
+await page.locator('.menubar button[title^="编辑器样式设置"]').click();
 await page.waitForSelector(".modal");
 check("设置弹窗打开", (await page.locator(".modal").count()) === 1);
 const dim0 = await page.locator(".setting-row", { hasText: "高亮颜色" }).innerText();
@@ -71,7 +71,7 @@ const lineBg = await page.evaluate(() => {
 check("光标行背景为自定义色", lineBg === "rgb(255, 46, 136)", lineBg);
 
 // 重开设置，切换主题 → 自定义色保留
-await page.locator('.menubar button[title="编辑器样式设置"]').click();
+await page.locator('.menubar button[title^="编辑器样式设置"]').click();
 await page.waitForSelector(".modal");
 await page.locator(".modal .theme-swatch").nth(3).click();
 await page.waitForTimeout(200);

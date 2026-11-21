@@ -647,6 +647,41 @@ export default function Editor({
         selection: { anchor: sel.head + actionSignal.text.length },
         scrollIntoView: true,
       });
+    } else if (actionSignal.type === "transform" && actionSignal.text) {
+      // 文字变换：upper / lower / title 作用于选区（无选中则当前行）；
+      // sort / sort-desc / dedupe / trim 作用于选中行（无选中则全文）
+      const kind = actionSignal.text;
+      const sel = view.state.selection.main;
+      const hasSel = sel.from !== sel.to;
+      if (kind === "upper" || kind === "lower" || kind === "title") {
+        const from = hasSel ? sel.from : view.state.doc.lineAt(sel.head).from;
+        const to = hasSel ? sel.to : view.state.doc.lineAt(sel.head).to;
+        const text = view.state.doc.sliceString(from, to);
+        const out =
+          kind === "upper"
+            ? text.toUpperCase()
+            : kind === "lower"
+              ? text.toLowerCase()
+              : text.toLowerCase().replace(/(^|[^A-Za-z'])([a-z])/g, (_m: string, p: string, c: string) => p + c.toUpperCase());
+        view.dispatch({
+          changes: { from, to, insert: out },
+          selection: { anchor: from + out.length },
+          scrollIntoView: true,
+        });
+      } else if (["sort", "sort-desc", "dedupe", "trim"].includes(kind)) {
+        const from = hasSel ? view.state.doc.lineAt(sel.from).from : 0;
+        const to = hasSel ? view.state.doc.lineAt(sel.to).to : view.state.doc.length;
+        const lines: string[] = view.state.doc.sliceString(from, to).split("\n");
+        let out: string[];
+        if (kind === "sort") out = [...lines].sort((a: string, b: string) => a.localeCompare(b, "zh"));
+        else if (kind === "sort-desc") out = [...lines].sort((a: string, b: string) => b.localeCompare(a, "zh"));
+        else if (kind === "dedupe") out = Array.from(new Set<string>(lines));
+        else out = lines.map((l) => l.trim());
+        view.dispatch({
+          changes: { from, to, insert: out.join("\n") },
+          scrollIntoView: true,
+        });
+      }
     } else if (actionSignal.type === "macro-replay" && actionSignal.items) {
       // 宏回放：按录制顺序重放文本输入与按键命令
       const v0 = viewRef.current;

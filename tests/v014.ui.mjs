@@ -82,7 +82,7 @@ check("测试文件已打开", (await editorText()).includes("apple"));
 // ---------- 1. 新入口 ----------
 const menuNames = await page.locator(".menubar button").allInnerTexts();
 for (const name of ["时间", "注释", "片段", "快捷键"]) {
-  check(`菜单栏含「${name}」入口`, menuNames.some((n) => n.trim() === name));
+  check(`菜单栏含「${name}」入口`, menuNames.some((n) => n.includes(name)));
 }
 
 await page.locator(".menubar button", { hasText: "设置" }).click();

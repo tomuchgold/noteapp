@@ -152,7 +152,7 @@ check("目录树显示子目录与文件", items.includes("src") && items.includ
 await blankRightClick();
 let menu = await ctxMenuItems();
 for (const m of ["新建文件", "新建文件夹", "全部打开", "切换文件夹…", "在系统中显示"]) {
-  check(`空白右键含「${m}」`, menu.includes(m), JSON.stringify(menu));
+  check(`空白右键含「${m}」`, menu.some((x) => x.includes(m)), JSON.stringify(menu));
 }
 await page.keyboard.press("Escape");
 await page.waitForTimeout(150);
@@ -179,7 +179,7 @@ await page.locator(".tree-item", { hasText: "a.txt" }).click({ button: "right" }
 await page.waitForSelector(".folder-context-menu");
 menu = await ctxMenuItems();
 for (const m of ["打开", "在系统中显示", "重命名", "删除"]) {
-  check(`文件右键含「${m}」`, menu.includes(m), JSON.stringify(menu));
+  check(`文件右键含「${m}」`, menu.some((x) => x.includes(m)), JSON.stringify(menu));
 }
 page.once("dialog", (d) => d.accept("b2.txt"));
 await page.locator(".folder-context-menu button", { hasText: "重命名" }).first().click();

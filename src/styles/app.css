@@ -2760,6 +2760,28 @@ kbd {
 }
 .rp-arrow { color: var(--ui-fg-dim); }
 
+/* v0.16 菜单栏「变换」下拉 */
+.menu-drop-wrap { position: relative; display: inline-flex; }
+.menu-drop-wrap .transform-menu {
+  display: block;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 60;
+  min-width: 190px;
+}
+.menu-drop-wrap .transform-menu button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  white-space: nowrap;
+}
+.menu-drop-wrap .transform-menu .menu-key {
+  opacity: 0.55;
+  font-size: 0.85em;
+}
+
 /* 设置项 label 不参与收缩、名称不换行（避免 emoji 挤压导致竖排） */
 .modal.settings .setting-row > label {
   flex-shrink: 0;

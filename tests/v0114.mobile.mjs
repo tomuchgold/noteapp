@@ -33,7 +33,7 @@ await page.addInitScript(() => {
 await page.goto("http://localhost:5203/", { waitUntil: "networkidle" });
 await page.waitForSelector(".cm-content");
 
-await page.locator('.menubar button[title="编辑器样式设置"]').click();
+await page.locator('.menubar button[title^="编辑器样式设置"]').click();
 await page.waitForSelector(".modal");
 
 // 弹窗不超出视口

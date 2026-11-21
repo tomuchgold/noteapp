@@ -18,6 +18,8 @@ interface Props {
   onReveal: (path: string) => void;
   /** 一键打开目录下所有文本文件 */
   onOpenAll: (dir: string) => void;
+  /** 打开某文件所在的文件夹（设为目录树根） */
+  onOpenFolderOf: (path: string) => void;
 }
 
 const FOLDER_KEY = "notepp.folder";
@@ -59,6 +61,7 @@ export default function FolderTree({
   onDelete,
   onReveal,
   onOpenAll,
+  onOpenFolderOf,
 }: Props) {
   const [entries, setEntries] = useState<DirEntryInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -141,23 +144,29 @@ export default function FolderTree({
   const renderItemMenu = (t: DirEntryInfo) => (
     <>
       {!t.is_dir && <button onClick={() => { setMenu(null); onOpenFile(t.path); }}>打开</button>}
+      {!t.is_dir && <button onClick={() => { setMenu(null); onOpenFolderOf(t.path); }}>📂 打开所在文件夹</button>}
       {t.is_dir && <button onClick={() => { setMenu(null); onCreateFile(t.path); }}>新建文件</button>}
       {t.is_dir && <button onClick={() => { setMenu(null); onCreateFolder(t.path); }}>新建文件夹</button>}
       {t.is_dir && <button onClick={() => { setMenu(null); onOpenAll(t.path); }}>全部打开</button>}
-      <button onClick={() => { setMenu(null); onReveal(t.path); }}>在系统中显示</button>
+      <button onClick={() => { setMenu(null); onReveal(t.path); }}>🖥️ 在系统中显示</button>
       <button onClick={() => { setMenu(null); onRename(t.path); }}>重命名</button>
       <button onClick={() => { setMenu(null); onDelete(t.path); }}>删除</button>
     </>
   );
 
   const renderRootMenu = () => (
-    <>
-      <button onClick={() => { setMenu(null); onCreateFile(root!); }}>新建文件</button>
-      <button onClick={() => { setMenu(null); onCreateFolder(root!); }}>新建文件夹</button>
-      <button onClick={() => { setMenu(null); onOpenAll(root!); }}>全部打开</button>
-      <button onClick={() => { setMenu(null); onPickFolder(); }}>切换文件夹…</button>
-      <button onClick={() => { setMenu(null); onReveal(root!); }}>在系统中显示</button>
-    </>
+    root ? (
+      <>
+        <button onClick={() => { setMenu(null); onCreateFile(root); }}>新建文件</button>
+        <button onClick={() => { setMenu(null); onCreateFolder(root); }}>新建文件夹</button>
+        <button onClick={() => { setMenu(null); onOpenAll(root); }}>全部打开</button>
+        <button onClick={() => { setMenu(null); onPickFolder(); }}>切换文件夹…</button>
+        <button onClick={() => { setMenu(null); onReveal(root); }}>🖥️ 在系统中显示</button>
+      </>
+    ) : (
+      // 未打开文件夹时只提供入口，避免对空路径操作报错
+      <button onClick={() => { setMenu(null); onPickFolder(); }}>📂 打开文件夹…</button>
+    )
   );
 
   const renderNodes = (list: DirEntryInfo[], depth: number) =>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.15.0</title>
+<title>NotePP 功能手册 — v0.16.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.15.0</span>
+    <span class="ver-badge">v0.16.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.15.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.16.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.15.0</b></span>
+        <span>当前版本 <b>v0.16.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -272,6 +272,20 @@
     <section class="doc-section" id="sec-editing">
       <h2><span class="num">02</span> ✏️ 编辑体验</h2>
       <p class="sec-lead">编辑器本色：缩放、高亮、换行与矩形选区，都能按习惯调。</p>
+
+      <div class="feature">
+        <h3><span class="ic">🔠</span>文字变换</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">一键完成常见文本整理：<b>转为大写 / 转为小写 / 首字母大写 / 行排序 A→Z / 行排序 Z→A / 去除重复行 / 去除行首尾空格</b>。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">选中文字后点菜单栏「🔠 变换」选择即可；<b>大小写类</b>无选中时作用于当前行，<b>排序/去重/去空格</b>无选中时作用于全文。转大写默认 <kbd>Ctrl+Alt+U</kbd>，转小写 <kbd>Ctrl+Alt+I</kbd>，均可在「快捷键设置」里改键。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「🔠 变换 ▾」</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📂</span>右键打开所在文件夹</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">在<b>标签页</b>、<b>文件列表</b>、<b>文件夹树</b>的任意文件上点右键，可直接把该文件所在的文件夹打开为侧栏目录树；也可选「在系统中显示」由系统文件管理器定位。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">右键标签 / 文件列表条目 / 目录树文件 → 「📂 打开所在文件夹」或「🖥️ 在系统中显示」。</span></div>
+        <div class="path"><span class="badge">路径</span>标签页 / 文件列表 / 文件夹树 → 右键</div>
+      </div>
 
       <div class="feature">
         <h3><span class="ic">🔠</span>正文缩放（最大 900px）</h3>
@@ -603,7 +617,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.15.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.16.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 
