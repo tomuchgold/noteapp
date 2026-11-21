@@ -70,6 +70,14 @@ import {
   openDirectoryDialog,
   copyMediaFile,
   searchInFolder,
+  pathIsDir,
+  makeDir,
+  renamePath,
+  deletePath,
+  revealInOS,
+  drainOpenedPaths,
+  listDir,
+  type DirEntryInfo,
 } from "./lib/files";
 import {
   clampFilelistWidth,
@@ -810,6 +818,168 @@ export default function App() {
     openPathRef.current = openPath;
   }, [openPath]);
 
+  // ---------- 文件夹树：本地文件操作（v0.15） ----------
+  const [folderReloadKey, setFolderReloadKey] = useState(0);
+
+  const joinPath = (dir: string, name: string): string => {
+    const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
+    return (dir.endsWith("/") || dir.endsWith("\\") ? dir : `${dir}${sep}`) + name;
+  };
+
+  /** 在指定目录新建文件（支持模板后缀：.txt/.md/.json/.log） */
+  const createFileIn = useCallback(async (dir: string) => {
+    const name = window.prompt("新建文件名（后缀决定模板：.txt / .md / .json / .log）", "未命名.txt");
+    if (!name || !name.trim()) return;
+    const path = joinPath(dir, name.trim());
+    const tpl = name.endsWith(".md")
+      ? `# ${name.replace(/\.md$/i, "")}\n\n`
+      : name.endsWith(".json")
+        ? "{\n  \n}\n"
+        : "";
+    try {
+      await writeTextFile({ path, content: tpl, encoding: "UTF-8", bom: false, eol: "LF" });
+      setFolderReloadKey((k) => k + 1);
+      await openPath(path);
+    } catch (e) {
+      alert(`新建文件失败：${e}`);
+    }
+  }, [openPath]);
+
+  /** 在指定目录新建文件夹 */
+  const createFolderIn = useCallback(async (dir: string) => {
+    const name = window.prompt("新建文件夹名", "新建文件夹");
+    if (!name || !name.trim()) return;
+    try {
+      await makeDir(joinPath(dir, name.trim()));
+      setFolderReloadKey((k) => k + 1);
+    } catch (e) {
+      alert(`新建文件夹失败：${e}`);
+    }
+  }, []);
+
+  /** 重命名（打开中的同名标签同步改名） */
+  const renameTreePath = useCallback(async (p: string) => {
+    const cur = p.split(/[\\/]/).pop() ?? p;
+    const newName = window.prompt("重命名为", cur);
+    if (!newName || !newName.trim() || newName.trim() === cur) return;
+    const parent = p.slice(0, p.length - cur.length - 1);
+    const to = joinPath(parent, newName.trim());
+    try {
+      await renamePath(p, to);
+      setFolderReloadKey((k) => k + 1);
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.path === p
+            ? { ...t, path: to, name: newName.trim() }
+            : t.path && t.path.startsWith(`${p}/`) || t.path?.startsWith(`${p}\\`)
+              ? { ...t, path: to + t.path.slice(p.length) }
+              : t
+        )
+      );
+    } catch (e) {
+      alert(`重命名失败：${e}`);
+    }
+  }, []);
+
+  /** 在系统文件管理器中定位 */
+  const revealTreePath = useCallback(async (p: string) => {
+    try {
+      await revealInOS(p);
+    } catch (e) {
+      alert(`定位失败：${e}`);
+    }
+  }, []);
+
+  /** 递归收集目录下的文本文件（上限 200，深度 5） */
+  const collectTextFiles = async (dir: string, acc: string[], depth = 0): Promise<string[]> => {
+    if (depth > 5 || acc.length >= 200) return acc;
+    let es: DirEntryInfo[] = [];
+    try {
+      es = await listDir(dir);
+    } catch {
+      return acc;
+    }
+    for (const e of es) {
+      if (acc.length >= 200) break;
+      if (e.is_dir) await collectTextFiles(e.path, acc, depth + 1);
+      else if (isTextFilePath(e.path)) acc.push(e.path);
+    }
+    return acc;
+  };
+
+  /** 一键打开目录下所有文本文件 */
+  const openAllInDir = useCallback(async (dir: string) => {
+    const files = await collectTextFiles(dir, []);
+    if (files.length === 0) {
+      setTabMessage("该文件夹里没有找到文本文件");
+      return;
+    }
+    if (files.length > 20 && !window.confirm(`共找到 ${files.length} 个文本文件，全部打开？`)) return;
+    for (const f of files) await openPathRef.current(f);
+    setTabMessage(`已打开 ${files.length} 个文件`);
+  }, [setTabMessage]);
+
+  /** 处理系统传入的路径（文件关联/单实例/argv/macOS Opened）：目录→打开文件夹，文本→开标签 */
+  const handleSystemPaths = useCallback(async (paths: string[]) => {
+    for (const p of paths) {
+      let isDir = false;
+      try {
+        isDir = (await pathIsDir(p)) === true;
+      } catch {
+        /* 非桌面环境忽略 */
+      }
+      if (isDir) {
+        setFolderRoot(p);
+        continue;
+      }
+      if (isTextFilePath(p)) {
+        await openPathRef.current(p);
+      } else {
+        setTabMessage(`已忽略非文本路径：${p.split(/[\\/]/).pop()}`);
+      }
+    }
+  }, [setTabMessage]);
+
+  // 系统传入路径：启动时 drain 一次（冷启动竞态兜底）+ 运行中监听 open-files 事件
+  const handleSystemPathsRef = useRef(handleSystemPaths);
+  useEffect(() => {
+    handleSystemPathsRef.current = handleSystemPaths;
+  }, [handleSystemPaths]);
+  const drainedRef = useRef(false);
+  useEffect(() => {
+    if (!drainedRef.current) {
+      drainedRef.current = true;
+      void (async () => {
+        try {
+          const paths = await drainOpenedPaths();
+          if (paths.length) await handleSystemPathsRef.current(paths);
+        } catch {
+          /* 浏览器环境无此命令 */
+        }
+      })();
+    }
+    let unlisten: (() => void) | null = null;
+    import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen<string[]>("open-files", (e) => {
+          void handleSystemPathsRef.current(e.payload ?? []);
+        })
+      )
+      .then((fn) => {
+        unlisten = fn ?? null;
+      })
+      .catch(() => {
+        /* 浏览器/测试环境 */
+      });
+    return () => {
+      try {
+        unlisten?.();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
+
   /** 大文件模式：追加下一块 */
   const loadMoreChunk = useCallback(async () => {
     const t = activeTab;
@@ -1053,6 +1223,20 @@ export default function App() {
     },
     [tabs, activeId]
   );
+
+  /** 删除文件/文件夹（打开中的标签一并关闭） */
+  const deleteTreePath = useCallback(async (p: string) => {
+    if (!window.confirm(`确认删除「${p.split(/[\\/]/).pop()}」？此操作不可恢复。`)) return;
+    try {
+      await deletePath(p);
+      setFolderReloadKey((k) => k + 1);
+      tabs
+        .filter((t) => t.path && (t.path === p || t.path.startsWith(`${p}/`) || t.path.startsWith(`${p}\\`)))
+        .forEach((t) => closeTab(t.id));
+    } catch (e) {
+      alert(`删除失败：${e}`);
+    }
+  }, [tabs, closeTab]);
 
   // ---------- 文件库操作 ----------
   const toggleFav = useCallback((path: string) => {
@@ -1331,14 +1515,27 @@ export default function App() {
     };
   }, [activeId, resetZoom]);
 
-  // ---------- 拖拽打开文件 ----------
+  // ---------- 拖拽打开文件 / 文件夹 ----------
   useEffect(() => {
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "drop") {
-        for (const p of event.payload.paths) {
-          if (isTextFilePath(p)) openPath(p);
-          else void insertMedia(p);
-        }
+        const { paths } = event.payload;
+        void (async () => {
+          for (const p of paths) {
+            let isDir = false;
+            try {
+              isDir = (await pathIsDir(p)) === true;
+            } catch {
+              /* 非桌面环境忽略 */
+            }
+            if (isDir) {
+              setFolderRoot(p);
+              continue;
+            }
+            if (isTextFilePath(p)) openPath(p);
+            else void insertMedia(p);
+          }
+        })();
       }
     });
     return () => {
@@ -1615,12 +1812,19 @@ export default function App() {
             <FolderTree
               root={folderRoot}
               activePath={activeTab?.path ?? null}
+              reloadKey={folderReloadKey}
               onOpenFile={openPath}
               onPickFolder={async () => {
                 const dir = await openDirectoryDialog();
                 if (dir) setFolderRoot(dir);
               }}
               onClear={() => setFolderRoot(null)}
+              onCreateFile={createFileIn}
+              onCreateFolder={createFolderIn}
+              onRename={renameTreePath}
+              onDelete={deleteTreePath}
+              onReveal={revealTreePath}
+              onOpenAll={openAllInDir}
             />
           </Sidebar>
         )}

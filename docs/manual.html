@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.14.0</title>
+<title>NotePP 功能手册 — v0.15.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.14.0</span>
+    <span class="ver-badge">v0.15.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.14.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.15.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.14.0</b></span>
+        <span>当前版本 <b>v0.15.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -227,9 +227,30 @@
 
       <div class="feature">
         <h3><span class="ic">🌳</span>文件夹树</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">侧栏内置目录树，方便在项目里逐层浏览。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">侧栏内置目录树，方便在项目里逐层浏览，右键即可完成常用的本地文件操作。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击侧栏「打开」按钮选择文件夹，逐层展开后直接点击文件打开；隐藏文件自动过滤。</span></div>
         <div class="path"><span class="badge">路径</span>侧栏「打开」按钮 → 选择文件夹</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🖱️</span>文件夹树右键菜单</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">在目录树或空白处点击右键，可<strong>新建文件 / 新建文件夹 / 重命名 / 删除 / 在系统中显示 / 全部打开 / 切换文件夹</strong>。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">右键空白处作用于根目录；右键文件夹可新建或一键打开其中所有文本；双击空白处直接新建文件；<kbd>Esc</kbd> 关闭菜单。新建 <code>.md</code> 自动带标题模板，<code>.json</code> 自动带花括号骨架；删除会同步关闭已打开的对应标签。</span></div>
+        <div class="path"><span class="badge">路径</span>侧栏文件夹树 → 右键</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">📎</span>系统文件关联与单实例</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">安装后，<code>txt / md / log / json / yaml / toml / csv / html / css / js / ts / py / rs / go / java / c / cpp / sh / sql</code> 等常见文本格式可在系统里「打开方式」中选择 NotePP；双击文件即可打开。同时应用为<strong>单实例</strong>：重复打开文件不会另起新窗口，而是在已开窗口里新增标签。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">双击文件或在「打开方式」里选 NotePP；传入的是文件夹时自动打开侧栏目录树；macOS 上 Finder 双击同样生效。</span></div>
+        <div class="path"><span class="badge">路径</span>系统文件管理器 → 打开方式 → NotePP</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🫳</span>拖拽打开文件与文件夹</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">把文件或<strong>整个文件夹</strong>拖进窗口：文本文件开成标签，图片/音频/视频插入当前文档作为附件，文件夹直接成为侧栏目录树根目录。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">从资源管理器把任意路径拖到 NotePP 窗口内松手即可。</span></div>
+        <div class="path"><span class="badge">路径</span>拖入窗口 → 自动识别文件 / 文件夹 / 媒体</div>
       </div>
 
       <div class="feature">
@@ -582,7 +603,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.14.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.15.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 

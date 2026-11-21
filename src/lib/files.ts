@@ -112,3 +112,41 @@ export function searchInFolder(
     },
   });
 }
+
+/** 判断路径是否为目录（拖入/外部打开时区分文件与文件夹） */
+export function pathIsDir(path: string): Promise<boolean> {
+  return invoke("path_is_dir", { path });
+}
+
+/** 创建目录（含父目录） */
+export function makeDir(path: string): Promise<void> {
+  return invoke("make_dir", { path });
+}
+
+/** 重命名 / 移动文件或文件夹 */
+export function renamePath(from: string, to: string): Promise<void> {
+  return invoke("rename_path", { from, to });
+}
+
+/** 删除文件或文件夹（文件夹递归删除） */
+export function deletePath(path: string): Promise<void> {
+  return invoke("delete_path", { path });
+}
+
+/** 在系统文件管理器中定位文件/文件夹 */
+export function revealInOS(path: string): Promise<void> {
+  return invoke("reveal_in_os", { path });
+}
+
+/**
+ * 取走系统传递过来的待打开路径（文件关联/单实例/argv），
+ * 返回后清空缓冲；浏览器/测试环境返回空数组。
+ */
+export async function drainOpenedPaths(): Promise<string[]> {
+  try {
+    const res = await invoke("opened_urls");
+    return Array.isArray(res) ? (res as string[]) : [];
+  } catch {
+    return [];
+  }
+}

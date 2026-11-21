@@ -496,3 +496,50 @@ pub fn read_file_chunk(path: String, offset: u64, length: u64) -> Result<String,
 
     Ok(String::from_utf8_lossy(&buf[start..end]).to_string())
 }
+
+/// 判断路径是否为目录（供前端决定拖入路径是打开文件夹还是打开文件）
+#[tauri::command]
+pub fn path_is_dir(path: String) -> Result<bool, String> {
+    Ok(fs::metadata(&path)
+        .map(|m| m.is_dir())
+        .map_err(|e| format!("读取失败：{}", e))?)
+}
+
+/// 创建目录（含父目录）
+#[tauri::command]
+pub fn make_dir(path: String) -> Result<(), String> {
+    fs::create_dir_all(&path).map_err(|e| format!("创建文件夹失败：{}", e))?;
+    Ok(())
+}
+
+/// 重命名 / 移动文件或文件夹
+#[tauri::command]
+pub fn rename_path(from: String, to: String) -> Result<(), String> {
+    if fs::metadata(&to).is_ok() {
+        return Err("目标路径已存在".to_string());
+    }
+    fs::rename(&from, &to).map_err(|e| format!("重命名失败：{}", e))?;
+    Ok(())
+}
+
+/// 删除文件或文件夹（文件夹递归删除，仅用于用户确认后的树内操作）
+#[tauri::command]
+pub fn delete_path(path: String) -> Result<(), String> {
+    let md = fs::metadata(&path).map_err(|e| format!("读取失败：{}", e))?;
+    if md.is_dir() {
+        fs::remove_dir_all(&path).map_err(|e| format!("删除文件夹失败：{}", e))?;
+    } else {
+        fs::remove_file(&path).map_err(|e| format!("删除文件失败：{}", e))?;
+    }
+    Ok(())
+}
+
+/// 在系统文件管理器中定位某个文件/文件夹（复用 opener 插件的 reveal 能力）
+#[tauri::command]
+pub fn reveal_in_os(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| format!("定位失败：{}", e))?;
+    Ok(())
+}
