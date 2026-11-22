@@ -2830,3 +2830,37 @@ kbd {
 .modal.settings .setting-row.setting-theme > .theme-msg {
   width: 100%;
 }
+
+/* ---------- v0.18 编辑器内嵌媒体渲染 ---------- */
+.cm-media {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 2px 4px;
+  line-height: 0;
+}
+.cm-media-img img {
+  max-width: min(360px, 60vw);
+  max-height: 240px;
+  display: block;
+  border-radius: 4px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: rgba(128, 128, 128, 0.08);
+}
+.cm-media-img.cm-media-broken img {
+  min-width: 60px;
+  min-height: 24px;
+  background: rgba(220, 80, 80, 0.15);
+}
+.cm-media-audio audio {
+  height: 34px;
+  max-width: 320px;
+  display: block;
+}
+.cm-media-video video {
+  max-width: min(480px, 70vw);
+  max-height: 320px;
+  display: block;
+  border-radius: 4px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: #000;
+}

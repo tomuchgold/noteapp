@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.17.0</title>
+<title>NotePP 功能手册 — v0.18.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.17.0</span>
+    <span class="ver-badge">v0.18.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.17.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.18.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.17.0</b></span>
+        <span>当前版本 <b>v0.18.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -631,7 +631,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.17.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.18.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 
@@ -650,10 +650,18 @@ graph LR
       </div>
 
       <div class="feature">
-        <h3><span class="ic">🖼️</span>拖拽媒体文件按引用插入</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">图片 / 音频 / 视频拖进窗口后，自动复制到文档旁的 <code>media/</code> 目录并插入引用，笔记与素材放在一起。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">把媒体文件直接拖到编辑器中即可；大文件只读模式下不支持插入媒体，会给出提示。</span></div>
-        <div class="path"><span class="badge">路径</span>拖放媒体文件到编辑器</div>
+        <h3><span class="ic">🖼️</span>插入媒体 / 附件（拖拽 / 菜单 / 右键）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">图片 / 音频 / 视频或任意附件插进文档：<b>拖拽</b>到编辑器、点菜单栏「🖼️ 媒体」选文件（可多选）、或在编辑区<b>右键 → 插入媒体/附件…</b>。自动归档模式下文件复制到文档旁 <code>media/</code> 目录（重名自动加序号）并插入引用，笔记与素材放在一起。</span></div>
+        <div class="frow"><span class="flabel">归档策略</span><span class="ftext">设置中「🖼️ 媒体归档」可选：<b>自动归档到 media/</b>（默认，推荐，移动文档不丢素材）或<b>相对路径引用</b>（不复制文件，直接引用原位置，适合素材已集中管理的情况）。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">三种插入方式任选；大文件只读模式下不支持插入媒体，会给出提示；文档未保存时会提示先 <kbd>Ctrl+S</kbd> 保存。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「媒体」/ 右键「插入媒体/附件…」/ 拖放媒体文件到编辑器</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🎬</span>编辑器内嵌媒体渲染</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">文档里的图片引用 <code>![名](media/…)</code> 直接渲染成<b>缩略图</b>；音频 / 视频引用渲染成<b>播放控件</b>，在笔记里点一下就能听 / 看，不用切出去。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">无需任何操作，打开含媒体引用的文档即自动渲染；<b>光标所在行始终显示原文</b>，方便修改引用路径。设置中「🎬 内嵌媒体渲染」可整体关闭，恢复纯文本显示。</span></div>
+        <div class="path"><span class="badge">路径</span>菜单栏「设置」→ 内嵌媒体渲染</div>
       </div>
     </section>
 

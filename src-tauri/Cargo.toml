@@ -1,6 +1,6 @@
 [package]
 name = "notepp"
-version = "0.17.0"
+version = "0.18.0"
 description = "NotePP - 轻量跨平台文本/代码编辑器"
 authors = ["NotePP Team"]
 edition = "2021"
@@ -9,7 +9,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }

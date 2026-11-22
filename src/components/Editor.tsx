@@ -26,6 +26,7 @@ import { effectiveFontSize } from "../lib/settings";
 import { findTheme, type ThemeDef } from "../lib/themes";
 import { HIGHLIGHT_COLORS, reconcileAnnotations, type Annotation, type AnnotationKind } from "../lib/annotations";
 import { expandSnippet, type Snippet } from "../lib/snippets";
+import { mediaExtension } from "../lib/mediaView";
 import type { MacroItem } from "../lib/types";
 
 /** 宏回放：按键 → CodeMirror 命令 */
@@ -75,6 +76,12 @@ interface Props {
   gotoRequest?: { n: number; from: number; to: number } | null;
   /** 代码片段列表：输入缩写后按 Tab 展开 */
   snippets?: Snippet[];
+  /** 当前文档所在目录（解析媒体相对引用用；null 表示未保存） */
+  mediaDir?: string | null;
+  /** 是否在编辑器内渲染图片/音视频 */
+  renderMedia?: boolean;
+  /** 右键菜单「插入媒体/附件…」回调 */
+  onInsertMedia?: () => void;
 }
 
 const languageComp = new Compartment();
@@ -89,6 +96,7 @@ const editableComp = new Compartment();
 const colComp = new Compartment();
 const annComp = new Compartment();
 const searchComp = new Compartment();
+const mediaComp = new Compartment();
 
 /** 查找高亮：全部命中 + 当前命中（当前命中用独立类，允许叠加） */
 export const setSearchMarksEffect = StateEffect.define<{ from: number; to: number; current: boolean }[]>();
@@ -342,6 +350,9 @@ export default function Editor({
   searchMarks = [],
   gotoRequest,
   snippets = [],
+  mediaDir = null,
+  renderMedia = true,
+  onInsertMedia,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -384,6 +395,7 @@ export default function Editor({
           paraComp.of(s.paragraphHighlight ? [paraHighlightPlugin] : []),
           annComp.of([annotationsField]),
           searchComp.of([searchMarksField]),
+          mediaComp.of(renderMedia && !readOnly ? [mediaExtension(mediaDir)] : []),
           styleComp.of(styleTheme(s)),
           editableComp.of(EditorView.editable.of(true)),
           colComp.of([]),
@@ -535,6 +547,15 @@ export default function Editor({
     if (!view) return;
     view.dispatch({ effects: setAnnotationsEffect.of(annotations) });
   }, [annotations]);
+
+  // 媒体渲染开关 / 文档目录变化 → 重新配置媒体渲染扩展
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: mediaComp.reconfigure(renderMedia && !readOnly ? [mediaExtension(mediaDir)] : []),
+    });
+  }, [mediaDir, renderMedia, readOnly]);
 
   // 查找高亮变化 → 应用装饰
   useEffect(() => {
@@ -763,7 +784,17 @@ export default function Editor({
     }
     const hits = hitAnnotations();
     const cached = selCacheRef.current;
-    if (sel.empty && hits.length === 0 && !cached) return; // 无选区且未命中标注 → 保留默认菜单
+    if (sel.empty && hits.length === 0 && !cached) {
+      // 无选区且未命中标注：只要上层提供了「插入媒体」，就弹插入菜单
+      if (!onInsertMedia) return; // 保留默认菜单
+      e.preventDefault();
+      setAiMenu({
+        x: Math.min(e.clientX, window.innerWidth - 230),
+        y: Math.min(e.clientY, window.innerHeight - 200),
+        text: "",
+      });
+      return;
+    }
     const text = sel.empty ? cached?.text ?? "" : view.state.sliceDoc(sel.from, sel.to);
     if (!sel.empty && !text.trim()) return;
     e.preventDefault();
@@ -845,6 +876,21 @@ export default function Editor({
                   标注信息
                 </button>
               </div>
+            </>
+          )}
+          {aiMenu && !aiMenu.text && (
+            <>
+              <div className="ai-menu-head">插入</div>
+              <button
+                className="ann-menu-item"
+                title="选择图片、音频、视频或任意附件，按设置的归档方式插入引用"
+                onClick={() => {
+                  setAiMenu(null);
+                  onInsertMedia?.();
+                }}
+              >
+                🖼️ 插入媒体/附件…
+              </button>
             </>
           )}
           {menuHits.length > 0 && (

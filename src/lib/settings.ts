@@ -28,6 +28,10 @@ export interface EditorSettings {
   uiScale: number;
   /** 查找浮窗字号倍率（百分比，70–200；在界面倍率基础上再叠加） */
   findScale: number;
+  /** 媒体归档策略：copy=自动复制到文档旁 media/（默认）；relative=直接写相对路径引用原位置 */
+  mediaMode: "copy" | "relative";
+  /** 在编辑器内直接渲染图片缩略图与音频/视频播放控件 */
+  renderMedia: boolean;
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
@@ -43,6 +47,8 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   theme: "dark",
   uiScale: 100,
   findScale: 100,
+  mediaMode: "copy",
+  renderMedia: true,
 };
 
 /** 界面/查找字号倍率范围 */
@@ -93,6 +99,8 @@ export function clampSettings(s: EditorSettings): EditorSettings {
     theme: typeof s.theme === "string" && s.theme ? s.theme : DEFAULT_SETTINGS.theme,
     uiScale: clamp(s.uiScale, UI_SCALE_MIN, UI_SCALE_MAX, DEFAULT_SETTINGS.uiScale),
     findScale: clamp(s.findScale, UI_SCALE_MIN, UI_SCALE_MAX, DEFAULT_SETTINGS.findScale),
+    mediaMode: s.mediaMode === "relative" ? "relative" : "copy",
+    renderMedia: !!s.renderMedia,
   };
 }
 

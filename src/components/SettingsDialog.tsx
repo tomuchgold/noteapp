@@ -268,6 +268,23 @@ export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap 
         </div>
 
         <div className="setting-row">
+          <Label icon="🖼️" name="媒体归档" tip="自动归档：插入的媒体复制到文档同目录 media/ 文件夹（推荐，移动文档不丢素材）；相对引用：不复制文件，直接写相对路径引用原位置。" dim={<span className="dim">{value.mediaMode === "copy" ? "自动复制到 media/" : "相对路径引用"}</span>} />
+          <select value={value.mediaMode} onChange={(e) => set({ mediaMode: e.target.value as "copy" | "relative" })}>
+            <option value="copy">自动归档到 media/</option>
+            <option value="relative">相对路径引用（不复制）</option>
+          </select>
+        </div>
+
+        <div className="setting-row">
+          <Label icon="🎬" name="内嵌媒体渲染" tip="在编辑器里直接显示图片缩略图和音频/视频播放控件；关闭则全部按原文显示。光标所在行始终显示原文，方便编辑引用。" />
+          <input
+            type="checkbox"
+            checked={value.renderMedia}
+            onChange={(e) => set({ renderMedia: e.target.checked })}
+          />
+        </div>
+
+        <div className="setting-row">
           <Label icon="🔊" name="朗读引擎" tip="系统内置：无需配置、离线可用（推荐）；OpenAI 兼容接口：填 API 地址与 Key，用云端音色朗读。" dim={<span className="dim">{tts.engine === "system" ? "系统内置（离线）" : "OpenAI 兼容接口"}</span>} />
           <select value={tts.engine} onChange={(e) => setTtsCfg({ engine: e.target.value as TtsConfig["engine"] })}>
             <option value="system">系统内置（免配置）</option>

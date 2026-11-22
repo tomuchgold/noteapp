@@ -58,6 +58,51 @@ export async function openDirectoryDialog(): Promise<string | null> {
   return typeof res === "string" ? res : null;
 }
 
+/** 选择要插入的媒体/附件文件（支持多选：图片/音频/视频/任意文件） */
+export async function pickMediaDialog(): Promise<string[] | null> {
+  const res = await open({
+    multiple: true,
+    filters: [
+      { name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"] },
+      { name: "音频", extensions: ["mp3", "wav", "ogg", "flac", "m4a", "aac", "opus"] },
+      { name: "视频", extensions: ["mp4", "webm", "mov", "avi", "mkv", "m4v"] },
+      { name: "所有文件", extensions: ["*"] },
+    ],
+  });
+  return Array.isArray(res) ? res : null;
+}
+
+/** 取路径中的目录部分（兼容 / 与 \ 分隔符） */
+export function dirName(p: string): string {
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i > 0 ? p.slice(0, i) : p;
+}
+
+/**
+ * 计算媒体文件相对文档目录的引用路径（媒体归档策略为「相对引用」时使用）。
+ * 文档与媒体在同一目录树时返回 media/xxx 之类；跨目录自动补 ../；
+ * 不同盘符等无法相对化的情况返回绝对路径。
+ */
+export function mediaRelativeRef(src: string, docPath: string): string {
+  const norm = (p: string) => p.replace(/[\\/]+/g, "/");
+  const t = norm(src);
+  const d = norm(dirName(docPath)).replace(/\/+$/, "");
+  const isWin = /^[A-Za-z]:/.test(t) || /^[A-Za-z]:/.test(d);
+  if (isWin) {
+    const dt = d[0]?.toLowerCase();
+    const st = t[0]?.toLowerCase();
+    if (dt && st && dt !== st) return t; // 不同盘符：只能绝对引用
+  }
+  const dd = d.split("/").filter(Boolean);
+  const tt = t.split("/").filter(Boolean);
+  if (t.startsWith("/") && !d.startsWith("/")) return t; // 绝对路径无从相对化
+  let i = 0;
+  while (i < dd.length && i < tt.length - 1 && dd[i].toLowerCase() === tt[i].toLowerCase()) i++;
+  const up = dd.length - i;
+  const rel = [...Array(up).fill(".."), ...tt.slice(i)].join("/");
+  return rel || t;
+}
+
 /** 目录条目（list_dir 命令返回） */
 export interface DirEntryInfo {
   name: string;

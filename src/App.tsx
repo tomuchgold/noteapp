@@ -78,6 +78,9 @@ import {
   revealInOS,
   drainOpenedPaths,
   listDir,
+  pickMediaDialog,
+  dirName,
+  mediaRelativeRef,
   type DirEntryInfo,
 } from "./lib/files";
 import {
@@ -768,11 +771,15 @@ export default function App() {
   const insertMedia = useCallback(
     async (srcPath: string) => {
       if (!activeTab) {
-        alert("请先新建或打开一个文档，再把媒体/附件拖进来。");
+        alert("请先新建或打开一个文档，再插入媒体/附件。");
         return;
       }
       if (!activeTab.path) {
-        alert("文档尚未保存。请先用 Ctrl+S 保存文档，媒体文件会复制到文档同目录的 media/ 文件夹下并以引用方式插入。");
+        alert(
+          editorSettings.mediaMode === "copy"
+            ? "文档尚未保存。请先用 Ctrl+S 保存文档，媒体文件会复制到文档同目录的 media/ 文件夹下并以引用方式插入。"
+            : "文档尚未保存。请先用 Ctrl+S 保存文档，才能按相对路径引用媒体文件。"
+        );
         return;
       }
       if (activeTab.readOnly) {
@@ -783,7 +790,11 @@ export default function App() {
       const ext = (file.split(".").pop() ?? "").toLowerCase();
       const stem = file.replace(/\.[^.]+$/, "");
       try {
-        const rel = await copyMediaFile(srcPath, activeTab.path);
+        // 归档策略：copy=复制到文档旁 media/；relative=直接相对路径引用原位置
+        const rel =
+          editorSettings.mediaMode === "copy"
+            ? await copyMediaFile(srcPath, activeTab.path)
+            : mediaRelativeRef(srcPath, activeTab.path);
         let snippet: string;
         if (MEDIA_IMG.has(ext)) snippet = `![${stem}](${rel})`;
         else if (MEDIA_AUDIO.has(ext)) snippet = `\n<audio controls src="${rel}"></audio>\n`;
@@ -791,11 +802,18 @@ export default function App() {
         else snippet = `\n[📎 ${file}](${rel})\n`;
         insertText(snippet);
       } catch (e) {
-        alert(`导入媒体失败：${e}`);
+        alert(`插入媒体失败：${e}`);
       }
     },
-    [activeTab, insertText]
+    [activeTab, insertText, editorSettings.mediaMode]
   );
+
+  /** 菜单/右键插入：打开文件选择框（可多选），逐个按归档策略插入 */
+  const pickAndInsertMedia = useCallback(async () => {
+    const paths = await pickMediaDialog();
+    if (!paths || paths.length === 0) return;
+    for (const p of paths) await insertMedia(p);
+  }, [insertMedia]);
 
   /** 判断拖入路径是当文本打开，还是作为媒体/附件插入引用 */
   const isTextFilePath = (p: string): boolean => {
@@ -1808,6 +1826,13 @@ export default function App() {
           📊 表格
         </button>
         <button
+          onClick={() => void pickAndInsertMedia()}
+          disabled={!activeTab}
+          title="插入媒体/附件：选择图片、音频、视频或任意文件，按设置的归档策略插入引用（右键编辑区也可插入）"
+        >
+          🖼️ 媒体
+        </button>
+        <button
           onClick={() => setPreviewOpen(true)}
           disabled={!activeTab}
           className={previewOpen ? "on" : ""}
@@ -2045,6 +2070,9 @@ export default function App() {
               searchMarks={searchMarks}
               gotoRequest={gotoRequest}
               snippets={snippets}
+              mediaDir={activeTab.path ? dirName(activeTab.path) : null}
+              renderMedia={editorSettings.renderMedia}
+              onInsertMedia={() => void pickAndInsertMedia()}
             />
             </>
           )
@@ -2078,6 +2106,8 @@ export default function App() {
             onZoom={zoomEditor}
             readOnly={splitTab.readOnly}
             snippets={snippets}
+            mediaDir={splitTab.path ? dirName(splitTab.path) : null}
+            renderMedia={editorSettings.renderMedia}
           />
         </div>
       )}
