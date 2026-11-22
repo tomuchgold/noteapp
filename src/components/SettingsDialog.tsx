@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { DEFAULT_SETTINGS, UI_SCALE_MAX, UI_SCALE_MIN, ZOOM_MAX, ZOOM_MIN, type EditorSettings } from "../lib/settings";
 import {
+  backupConfigured,
+  doBackup,
+  doRestore,
+  loadBackupConfig,
+  saveBackupConfig,
+  type BackupConfig,
+} from "../lib/backup";
+import {
   loadTtsConfig,
   saveTtsConfig,
   speak,
@@ -29,6 +37,40 @@ export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap 
   const [customMsg, setCustomMsg] = useState<string | null>(null);
   const [tts, setTts] = useState<TtsConfig>(() => loadTtsConfig());
   const [ttsMsg, setTtsMsg] = useState<string | null>(null);
+  const [backup, setBackup] = useState<BackupConfig>(() => loadBackupConfig());
+  const [backupMsg, setBackupMsg] = useState<string | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const setBk = (patch: Partial<BackupConfig>) => {
+    const next = { ...backup, ...patch };
+    setBackup(next);
+    saveBackupConfig(next);
+  };
+  const runBackup = async () => {
+    setBackupMsg(null);
+    setBackupBusy(true);
+    try {
+      const id = await doBackup(backup);
+      setBackup(id ? { ...backup, gistId: id } : backup);
+      saveBackupConfig({ ...backup, gistId: id });
+      setBackupMsg(`✅ 备份成功（Gist ${id.slice(0, 8)}…）`);
+    } catch (e) {
+      setBackupMsg(`❌ 备份失败：${e instanceof Error ? e.message : e}`);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+  const runRestore = async () => {
+    setBackupMsg(null);
+    setBackupBusy(true);
+    try {
+      const msg = await doRestore(backup);
+      setBackupMsg(msg.includes("已恢复") ? `✅ ${msg}` : msg);
+    } catch (e) {
+      setBackupMsg(`❌ 恢复失败：${e instanceof Error ? e.message : e}`);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
   const setTtsCfg = (patch: Partial<TtsConfig>) => {
     const next = { ...tts, ...patch };
     setTts(next);
@@ -333,6 +375,50 @@ export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap 
           </span>
         </div>
         {ttsMsg && <div className="dim theme-msg">{ttsMsg}</div>}
+
+        <div className="setting-row">
+          <Label icon="☁️" name="GitHub Token" tip="用于把笔记与设置备份到你的私有 GitHub Gist。需要一个有 gist 权限的 Token（GitHub → Settings → Developer settings → Personal access tokens）。" dim={<span className="dim">{backup.token ? "已配置" : "未配置"}</span>} />
+          <input
+            type="password"
+            value={backup.token}
+            placeholder="github_pat_… / ghp_…"
+            style={{ width: 220 }}
+            onChange={(e) => setBk({ token: e.target.value })}
+          />
+        </div>
+
+        <div className="setting-row">
+          <Label icon="🆔" name="Gist ID" tip="备份存放的 Gist。留空时点「立即备份」会自动创建私有 Gist 并回填；之后每次备份都更新这个 Gist。" dim={<span className="dim">{backupConfigured(backup) ? "就绪" : backup.gistId ? "缺 Token" : "首次备份自动创建"}</span>} />
+          <input
+            type="text"
+            value={backup.gistId}
+            placeholder="首次备份自动创建"
+            style={{ width: 220 }}
+            onChange={(e) => setBk({ gistId: e.target.value })}
+          />
+        </div>
+
+        <div className="setting-row">
+          <Label icon="🔄" name="自动备份" tip="每次保存文件后自动备份到 GitHub（15 分钟节流，避免频繁请求）。" />
+          <input
+            type="checkbox"
+            checked={backup.autoBackup}
+            onChange={(e) => setBk({ autoBackup: e.target.checked })}
+          />
+        </div>
+
+        <div className="setting-row">
+          <Label icon="📤" name="立即备份 / 恢复" tip="备份：把文件库中所有文件内容 + 标注 + 全部设置上传到私有 Gist；恢复：从 Gist 下载并覆盖本地（会先确认）。" />
+          <span style={{ display: "flex", gap: 6 }}>
+            <button disabled={backupBusy || !backup.token.trim()} onClick={() => void runBackup()}>
+              {backupBusy ? "处理中…" : "📤 立即备份"}
+            </button>
+            <button disabled={backupBusy || !backupConfigured(backup)} onClick={() => void runRestore()}>
+              ⬇️ 从云端恢复
+            </button>
+          </span>
+        </div>
+        {backupMsg && <div className="dim theme-msg">{backupMsg}</div>}
 
         <div className="modal-actions">
           <button onClick={() => onChange({ ...DEFAULT_SETTINGS })}>恢复默认</button>

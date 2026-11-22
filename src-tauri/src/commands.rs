@@ -543,3 +543,121 @@ pub fn reveal_in_os(app: tauri::AppHandle, path: String) -> Result<(), String> {
         .map_err(|e| format!("定位失败：{}", e))?;
     Ok(())
 }
+
+// ---------- GitHub 云备份（私有 Gist，v0.20） ----------
+
+fn github_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .user_agent("NotePP")
+        .build()
+        .map_err(|e| format!("初始化网络客户端失败：{}", e))
+}
+
+fn github_headers(token: &str) -> Result<reqwest::header::HeaderMap, String> {
+    let mut h = reqwest::header::HeaderMap::new();
+    h.insert("Accept", reqwest::header::HeaderValue::from_static("application/vnd.github+json"));
+    h.insert(
+        reqwest::header::AUTHORIZATION,
+        reqwest::header::HeaderValue::from_str(&format!("Bearer {}", token.trim()))
+            .map_err(|_| "Token 含非法字符".to_string())?,
+    );
+    Ok(h)
+}
+
+fn gist_file_text(v: &serde_json::Value, filename: &str) -> Option<String> {
+    v["files"][filename]["content"].as_str().map(|s| s.to_string())
+}
+
+/// 上传备份到 Gist：gist_id 为空则创建新的私有 Gist，返回 gist id；否则更新
+#[tauri::command]
+pub async fn gist_upload(
+    token: String,
+    gist_id: String,
+    filename: String,
+    content: String,
+    description: String,
+) -> Result<String, String> {
+    if token.trim().is_empty() {
+        return Err("未配置 GitHub Token".into());
+    }
+    if filename.trim().is_empty() {
+        return Err("备份文件名不能为空".into());
+    }
+    let client = github_client()?;
+    let headers = github_headers(&token)?;
+    let body = serde_json::json!({
+        "description": if description.trim().is_empty() { "NotePP backup".to_string() } else { description },
+        "files": { filename.clone(): { "content": content } },
+        "public": false,
+    });
+
+    let gid = gist_id.trim().to_string();
+    let resp = if gid.is_empty() {
+        client
+            .post("https://api.github.com/gists")
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("创建 Gist 失败：{}", e))?
+    } else {
+        client
+            .patch(format!("https://api.github.com/gists/{}", gid))
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("更新 Gist 失败：{}", e))?
+    };
+
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| format!("读取响应失败：{}", e))?;
+    if !status.is_success() {
+        let hint = if status.as_u16() == 401 {
+            "（Token 无效或已过期，请检查 GitHub 设置中的 Token）"
+        } else {
+            ""
+        };
+        return Err(format!("HTTP {}：{}{}", status.as_u16(), hint, &text[..text.len().min(300)]));
+    }
+    let v: serde_json::Value =
+        serde_json::from_str(&text).map_err(|_| format!("响应不是合法 JSON：{}", &text[..text.len().min(200)]))?;
+    v["id"]
+        .as_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "响应中没有 Gist id".to_string())
+}
+
+/// 从 Gist 下载备份文件内容
+#[tauri::command]
+pub async fn gist_download(token: String, gist_id: String, filename: String) -> Result<String, String> {
+    if token.trim().is_empty() {
+        return Err("未配置 GitHub Token".into());
+    }
+    let gid = gist_id.trim().to_string();
+    if gid.is_empty() {
+        return Err("未配置 Gist ID，请先完成一次备份".into());
+    }
+    let client = github_client()?;
+    let resp = client
+        .get(format!("https://api.github.com/gists/{}", gid))
+        .headers(github_headers(&token)?)
+        .send()
+        .await
+        .map_err(|e| format!("下载失败：{}", e))?;
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| format!("读取响应失败：{}", e))?;
+    if !status.is_success() {
+        let hint = if status.as_u16() == 404 {
+            "（Gist 不存在：检查 Gist ID 或 Token 是否有权限）"
+        } else {
+            ""
+        };
+        return Err(format!("HTTP {}：{}{}", status.as_u16(), hint, &text[..text.len().min(300)]));
+    }
+    let v: serde_json::Value =
+        serde_json::from_str(&text).map_err(|_| format!("响应不是合法 JSON：{}", &text[..text.len().min(200)]))?;
+    gist_file_text(&v, filename.trim())
+        .ok_or_else(|| format!("Gist 中没有找到文件 {}", filename))
+}

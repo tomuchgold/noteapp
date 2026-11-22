@@ -94,6 +94,7 @@ import {
   type LayoutState,
 } from "./lib/layout";
 import { clampSettings, effectiveFontSize, loadSettings, saveSettings, UI_SCALE_MAX, UI_SCALE_MIN, ZOOM_STEP, type EditorSettings } from "./lib/settings";
+import { maybeAutoBackup } from "./lib/backup";
 import { findTheme, themeUiVars } from "./lib/themes";
 import {
   loadAnnotations,
@@ -766,6 +767,15 @@ export default function App() {
   }, [splitId, tabs, activeId]);
 
   // ---------- 拖拽多媒体/附件（引用插入） ----------
+  /** 判断路径是否在文件夹树根目录之下（保存/媒体归档后决定是否刷新树） */
+  const isUnderFolderRoot = useCallback((p: string, r: string | null): boolean => {
+    if (!r || !p) return false;
+    const norm = (x: string) => x.replace(/[\\/]+$/, "").toLowerCase();
+    const rr = norm(r);
+    const f = norm(p);
+    if (f === rr) return true;
+    return f.startsWith(rr) && (f[rr.length] === "/" || f[rr.length] === "\\");
+  }, []);
   const MEDIA_IMG = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
   const MEDIA_AUDIO = new Set(["mp3", "wav", "ogg", "flac", "m4a", "aac", "opus"]);
   const MEDIA_VIDEO = new Set(["mp4", "webm", "mov", "avi", "mkv", "m4v"]);
@@ -797,6 +807,9 @@ export default function App() {
           editorSettings.mediaMode === "copy"
             ? await copyMediaFile(srcPath, activeTab.path)
             : mediaRelativeRef(srcPath, activeTab.path);
+        // media/ 目录可能新建 → 刷新文件夹树
+        if (editorSettings.mediaMode === "copy" && folderRoot && isUnderFolderRoot(activeTab.path, folderRoot))
+          setFolderReloadKey((k) => k + 1);
         let snippet: string;
         if (MEDIA_IMG.has(ext)) snippet = `![${stem}](${rel})`;
         else if (MEDIA_AUDIO.has(ext)) snippet = `\n<audio controls src="${rel}"></audio>\n`;
@@ -807,7 +820,7 @@ export default function App() {
         alert(`插入媒体失败：${e}`);
       }
     },
-    [activeTab, insertText, editorSettings.mediaMode]
+    [activeTab, insertText, editorSettings.mediaMode, folderRoot, isUnderFolderRoot]
   );
 
   /** 菜单/右键插入：打开文件选择框（可多选），逐个按归档策略插入 */
@@ -1300,12 +1313,16 @@ export default function App() {
             : t
         )
       );
+      // 保存到文件夹树目录内 → 刷新树（保留展开状态）
+      if (folderRoot && isUnderFolderRoot(path, folderRoot)) setFolderReloadKey((k) => k + 1);
+      // 自动备份（GitHub Gist，15 分钟节流；未启用则跳过）
+      maybeAutoBackup();
       return true;
     } catch (e) {
       alert(`保存失败：${e}`);
       return false;
     }
-  }, []);
+  }, [folderRoot, isUnderFolderRoot]);
 
   /** 关闭标签：脏文件先确认 */
   const closeTab = useCallback(

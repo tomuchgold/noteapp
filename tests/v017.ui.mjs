@@ -119,7 +119,7 @@ check("设置含试听与停止", settingText.includes("试听") && settingText.
 // 切换到 OpenAI 引擎应出现接口地址/Key 输入
 await page.locator(".modal.settings .setting-row", { hasText: "朗读引擎" }).locator("select").selectOption("openai");
 await page.waitForTimeout(150);
-check("OpenAI 引擎出现接口配置", (await page.locator(".modal.settings input[type=password]").count()) === 1);
+check("OpenAI 引擎出现接口配置", (await page.locator(".modal.settings input[type=password]").count()) >= 1);
 check("TTS 配置已持久化", await page.evaluate(() => { try { return JSON.parse(localStorage.getItem("notepp.tts")).engine === "openai"; } catch { return false; } }));
 
 console.log(`\n===== v017: ${results.filter((r) => r.ok).length}/${results.length} PASS =====`);

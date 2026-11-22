@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listDir, type DirEntryInfo } from "../lib/files";
 
 interface Props {
@@ -69,26 +69,70 @@ export default function FolderTree({
   const [children, setChildren] = useState<Record<string, DirEntryInfo[]>>({});
   const [loading, setLoading] = useState(false);
   const [menu, setMenu] = useState<CtxMenu | null>(null);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+  const prevRootRef = useRef<string | null>(null);
 
-  // 根目录变化 / 请求刷新 → 重新加载根层级
+  /** 重新加载根目录；reset=false 时保留展开状态并同步刷新所有已展开的子目录 */
+  const doRefresh = useCallback(
+    async (r: string, reset: boolean) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const es = await listDir(r);
+        setEntries(es);
+        if (reset) {
+          setExpanded(new Set());
+          setChildren({});
+          return;
+        }
+        // 保留展开状态：逐个刷新已展开子目录的内容
+        const dirs = [...expandedRef.current];
+        if (dirs.length > 0) {
+          const results = await Promise.all(
+            dirs.map((d) => listDir(d).catch(() => [] as DirEntryInfo[]))
+          );
+          setChildren((c) => {
+            const next = { ...c };
+            dirs.forEach((d, i) => {
+              next[d] = results[i];
+            });
+            return next;
+          });
+          // 已被删除/不存在的目录自动收起
+          const gone = dirs.filter((d, i) => es.every((e) => e.path !== d) && results[i].length === 0);
+          if (gone.length > 0) {
+            setExpanded((prev) => {
+              const n = new Set(prev);
+              gone.forEach((d) => n.delete(d));
+              return n;
+            });
+          }
+        }
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // 根目录变化 → 全量重置加载；reloadKey 变化（新建/重命名/删除/另存为/外部刷新）→ 保留展开刷新
   useEffect(() => {
     if (!root) {
       setEntries([]);
       setError(null);
+      setExpanded(new Set());
+      setChildren({});
+      prevRootRef.current = null;
       return;
     }
     saveFolder(root);
-    setLoading(true);
-    setError(null);
-    listDir(root)
-      .then((es) => {
-        setEntries(es);
-        setExpanded(new Set());
-        setChildren({});
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  }, [root, reloadKey]);
+    const reset = prevRootRef.current !== root;
+    prevRootRef.current = root;
+    void doRefresh(root, reset);
+  }, [root, reloadKey, doRefresh]);
 
   // 右键菜单：点击空白 / 失焦 / Esc 关闭
   useEffect(() => {
@@ -215,6 +259,11 @@ export default function FolderTree({
           {root && (
             <button className="mini" onClick={() => root && onCreateFile(root)} title="在根目录新建文件">
               ＋
+            </button>
+          )}
+          {root && (
+            <button className="mini" onClick={() => root && void doRefresh(root, false)} title="刷新文件夹树（保留展开状态）">
+              ⟳
             </button>
           )}
           {root && (
