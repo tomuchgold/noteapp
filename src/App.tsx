@@ -1171,13 +1171,16 @@ export default function App() {
     if (sessionLoaded.current) return;
     sessionLoaded.current = true;
     (async () => {
-      let session: { paths: string[]; activePath: string | null } | null = null;
+      let session: { paths: string[]; activePath: string | null; drafts?: { path: string | null; name: string; content: string }[] } | null = null;
       try {
         session = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
       } catch {
         session = null;
       }
       const paths = session?.paths ?? [];
+      const drafts: { path: string | null; name: string; content: string }[] = Array.isArray(session?.drafts)
+        ? session.drafts
+        : [];
       const loaded: FileTab[] = [];
       for (const p of paths) {
         try {
@@ -1196,6 +1199,28 @@ export default function App() {
           // 文件已失效（被移动/删除），跳过
         }
       }
+      // 草稿恢复：未保存的新文件 / 已保存但未保存的修改
+      for (const d of drafts) {
+        if (!d || typeof d.content !== "string") continue;
+        if (d.path) {
+          const t = loaded.find((x) => x.path === d.path);
+          if (t && d.content !== t.content) {
+            t.content = d.content;
+            t.dirty = true;
+          }
+        } else {
+          loaded.push({
+            id: newId(),
+            path: null,
+            name: d.name || "未命名",
+            content: d.content,
+            dirty: true,
+            encoding: "UTF-8",
+            bom: false,
+            eol: "LF",
+          });
+        }
+      }
       if (loaded.length === 0) {
         newTab();
         return;
@@ -1207,12 +1232,19 @@ export default function App() {
     })();
   }, [newTab]);
 
-  // ---------- 会话持久化：标签变化时保存路径列表 ----------
+  // ---------- 会话持久化：标签变化时保存路径列表 + 未保存草稿 ----------
   useEffect(() => {
     if (!sessionLoaded.current) return;
     const paths = tabs.filter((t) => t.path).map((t) => t.path!);
     const activePath = tabs.find((t) => t.id === activeId && t.path)?.path ?? null;
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ paths, activePath }));
+    // 草稿：未保存的新文件 + 已保存但有未落盘修改的标签（单个上限 500KB，总量上限约 4MB）
+    const DRAFT_MAX = 500_000;
+    let drafts = tabs
+      .filter((t) => !t.readOnly && (!t.path || t.dirty) && t.content.length > 0 && t.content.length <= DRAFT_MAX)
+      .map((t) => ({ path: t.path ?? null, name: t.name, content: t.content }));
+    const payload = JSON.stringify({ paths, activePath, drafts });
+    if (payload.length > 4_000_000) drafts = []; // 超限只保路径，保证设置不爆 localStorage
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ paths, activePath, drafts }));
   }, [tabs, activeId]);
 
   // ---------- 外部文件变更监听：轮询 mtime/size，磁盘被改时提示/自动重载 ----------

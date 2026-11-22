@@ -167,6 +167,8 @@ check("回放宏把文本写回编辑器", docAfter.length > docBefore.length &&
 
 // ---------- 4. 列编辑：短行/空行补空格成直线 ----------
 await page.evaluate(() => localStorage.removeItem("notepp.saved-macros"));
+// v0.20.1 起草稿会随会话恢复（预期行为），此处清掉会话以回到磁盘干净状态
+await page.evaluate(() => localStorage.removeItem("notepp.session"));
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForSelector(".cm-content");
 await page.keyboard.press("Control+o");
@@ -217,7 +219,7 @@ const manualPath = "/workspace/site/manual.html";
 check("功能手册网页存在", existsSync(manualPath));
 if (existsSync(manualPath)) {
   const html = readFileSync(manualPath, "utf-8");
-  check("手册含版本 v0.19.0", html.includes("v0.19.0"));
+  check("手册含版本 v0.20.1", html.includes("v0.20.1"));
   check("手册覆盖全部功能章节", ["文件与标签", "编辑体验", "主题外观", "查找替换", "Markdown", "对比与预览", "标注", "宏", "AI 辅助", "快捷键"].every((k) => html.includes(k)));
   check("手册含宏保存与导入导出说明", html.includes("宏管理") && html.includes("导入") && html.includes("导出"));
   check("首页有功能手册入口", readFileSync("/workspace/site/index.html", "utf-8").includes("manual.html"));
