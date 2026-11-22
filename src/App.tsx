@@ -52,9 +52,11 @@ import { checkUpdate, type UpdateInfo } from "./lib/update";
 import {
   AI_ACTIONS,
   isConfigured,
+  isImageReady,
   loadAiConfig,
   resolveConfig,
   runAiActionStream,
+  runImageGen,
   saveAiConfig,
   type AiAction,
   type AiConfig,
@@ -814,6 +816,34 @@ export default function App() {
     if (!paths || paths.length === 0) return;
     for (const p of paths) await insertMedia(p);
   }, [insertMedia]);
+
+  // ---------- AI 生图（v0.19） ----------
+  const aiImgReady = isImageReady(aiConfig);
+  const [imgGenerating, setImgGenerating] = useState(false);
+  const handleImageGen = useCallback(async () => {
+    if (!activeTab) return;
+    if (activeTab.readOnly) {
+      alert("大文件模式为只读，不支持插入生成的图片。");
+      return;
+    }
+    if (!aiImgReady) {
+      alert("尚未配置 AI 生图：请先在「AI 设置」中填写 API 地址、Key 与生图模型。");
+      setAiSettingsOpen(true);
+      return;
+    }
+    const desc = window.prompt("AI 生图：请输入图片描述", "");
+    if (!desc || !desc.trim()) return;
+    setImgGenerating(true);
+    try {
+      const urls = await runImageGen(aiConfig, desc.trim(), 1);
+      if (urls.length === 0) throw new Error("API 未返回图片");
+      insertText(`\n![${desc.trim().slice(0, 40)}](${urls[0]})\n`);
+    } catch (e) {
+      alert(`AI 生图失败：${e instanceof Error ? e.message : e}`);
+    } finally {
+      setImgGenerating(false);
+    }
+  }, [activeTab, aiImgReady, aiConfig, insertText]);
 
   /** 判断拖入路径是当文本打开，还是作为媒体/附件插入引用 */
   const isTextFilePath = (p: string): boolean => {
@@ -1831,6 +1861,13 @@ export default function App() {
           title="插入媒体/附件：选择图片、音频、视频或任意文件，按设置的归档策略插入引用（右键编辑区也可插入）"
         >
           🖼️ 媒体
+        </button>
+        <button
+          onClick={() => void handleImageGen()}
+          disabled={!activeTab || imgGenerating}
+          title="AI 生图：输入描述生成图片并在光标处插入引用（需在 AI 设置中填好生图模型）"
+        >
+          {imgGenerating ? "⏳ 生图…" : "🎨 生图"}
         </button>
         <button
           onClick={() => setPreviewOpen(true)}

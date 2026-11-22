@@ -24,6 +24,8 @@ export interface ProviderPreset {
   /** 是否需要 API Key（本地 Ollama 不需要） */
   needKey: boolean;
   note?: string;
+  /** 预设生图模型（可选，v0.19 起用于 AI 生图） */
+  imgModels?: string[];
 }
 
 /** 预设厂商：全部走 OpenAI 兼容的 /chat/completions */
@@ -43,6 +45,7 @@ export const PROVIDERS: ProviderPreset[] = [
     models: ["agnes-2.5-flash", "agnes-2.5-pro", "agnes-2.5-pro-beta"],
     needKey: true,
     note: "OpenAI 兼容网关，flash 便宜、pro 推理强",
+    imgModels: ["agnes-image-2.5-flash"],
   },
   {
     id: "sensenova",
@@ -110,6 +113,8 @@ export interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  /** 生图模型（AI 生图用，可留空表示不支持） */
+  imgModel?: string;
 }
 
 export interface AiConfig {
@@ -122,7 +127,7 @@ export interface AiConfig {
 export const AI_CONFIG_KEY = "notepp.ai";
 
 export function defaultProviderConfig(p: ProviderPreset): ProviderConfig {
-  return { apiKey: "", baseUrl: p.baseUrl, model: p.models[0] ?? "" };
+  return { apiKey: "", baseUrl: p.baseUrl, model: p.models[0] ?? "", imgModel: p.imgModels?.[0] ?? "" };
 }
 
 export function loadAiConfig(): AiConfig {
@@ -162,6 +167,14 @@ export function isConfigured(c: AiConfig, id: ProviderId = c.active): boolean {
   const cfg = resolveConfig(c, id);
   const keyOk = !preset.needKey || cfg.apiKey.trim().length > 0;
   return keyOk && cfg.baseUrl.trim().length > 0 && cfg.model.trim().length > 0;
+}
+
+/** 生图是否可用（地址 + Key + 生图模型齐备） */
+export function isImageReady(c: AiConfig, id: ProviderId = c.active): boolean {
+  const preset = providerPreset(id);
+  const cfg = resolveConfig(c, id);
+  const keyOk = !preset.needKey || cfg.apiKey.trim().length > 0;
+  return keyOk && cfg.baseUrl.trim().length > 0 && (cfg.imgModel ?? "").trim().length > 0;
 }
 
 // ---------- 动作 ----------
@@ -295,6 +308,26 @@ export async function runAiActionStream(
 
 export async function fetchModels(baseUrl: string, apiKey: string): Promise<string[]> {
   return invoke<string[]>("ai_models", { baseUrl, apiKey });
+}
+
+/** AI 生图：调 OpenAI 兼容 /images/generations，返回图片 URL（b64 已转 data URL） */
+export async function runImageGen(config: AiConfig, prompt: string, n = 1, size?: string): Promise<string[]> {
+  const cfg = resolveConfig(config);
+  if (!cfg.baseUrl.trim()) throw new Error("未配置 API 地址，请打开「AI 设置」");
+  if (providerPreset(config.active).needKey && !cfg.apiKey.trim())
+    throw new Error("未配置 API Key，请打开「AI 设置」");
+  if (!(cfg.imgModel ?? "").trim()) throw new Error("未配置生图模型，请打开「AI 设置」");
+  const res = await invoke<{ urls: string[]; model: string }>("ai_image", {
+    req: {
+      base_url: cfg.baseUrl,
+      api_key: cfg.apiKey,
+      model: cfg.imgModel,
+      prompt,
+      n,
+      size: size ?? null,
+    },
+  });
+  return res.urls;
 }
 
 /** 导出配置（含 Key，明文，导入前请确认接收方可信） */

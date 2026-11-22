@@ -217,7 +217,7 @@ const manualPath = "/workspace/site/manual.html";
 check("功能手册网页存在", existsSync(manualPath));
 if (existsSync(manualPath)) {
   const html = readFileSync(manualPath, "utf-8");
-  check("手册含版本 v0.18.0", html.includes("v0.18.0"));
+  check("手册含版本 v0.19.0", html.includes("v0.19.0"));
   check("手册覆盖全部功能章节", ["文件与标签", "编辑体验", "主题外观", "查找替换", "Markdown", "对比与预览", "标注", "宏", "AI 辅助", "快捷键"].every((k) => html.includes(k)));
   check("手册含宏保存与导入导出说明", html.includes("宏管理") && html.includes("导入") && html.includes("导出"));
   check("首页有功能手册入口", readFileSync("/workspace/site/index.html", "utf-8").includes("manual.html"));

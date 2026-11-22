@@ -151,6 +151,21 @@ export default function AiSettingsDialog({ config, onSave, onClose }: Props) {
             </datalist>
           </label>
 
+          <label className="field">
+            <span>生图模型（可选，AI 生图用）</span>
+            <input
+              value={cfg.imgModel ?? ""}
+              list="ai-img-model-options"
+              placeholder={preset.imgModels?.[0] ?? "如 agnes-image-2.5-flash / dall-e-3"}
+              onChange={(e) => patchCfg({ imgModel: e.target.value })}
+            />
+            <datalist id="ai-img-model-options">
+              {(preset.imgModels ?? []).map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+          </label>
+
           <div className="row-actions">
             <button onClick={pullModels} disabled={busy}>
               {busy ? "拉取中…" : "拉取模型列表"}

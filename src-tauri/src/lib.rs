@@ -96,6 +96,7 @@ pub fn run() {
             ai::ai_chat,
             ai::ai_models,
             ai::ai_chat_stream,
+            ai::ai_image,
             ai::check_update
         ])
         .setup(|app| {

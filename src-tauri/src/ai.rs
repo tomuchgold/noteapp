@@ -51,6 +51,99 @@ fn client() -> Result<reqwest::Client, String> {
         .map_err(|e| format!("初始化网络客户端失败：{}", e))
 }
 
+// ---------- 图片生成（OpenAI 兼容 /images/generations） ----------
+
+#[derive(Deserialize)]
+pub struct AiImageRequest {
+    pub base_url: String,
+    pub api_key: String,
+    pub model: String,
+    pub prompt: String,
+    #[serde(default = "default_image_n")]
+    pub n: u32,
+    /// 可选：1K / 2K / 4K（Agnes）或 1024x1024（OpenAI），空则不带 size 字段
+    #[serde(default)]
+    pub size: Option<String>,
+}
+
+fn default_image_n() -> u32 {
+    1
+}
+
+#[derive(Serialize)]
+pub struct AiImageResult {
+    pub urls: Vec<String>,
+    pub model: String,
+}
+
+/// 调用 OpenAI 兼容的 images/generations；b64_json 结果自动转 data URL
+#[tauri::command]
+pub async fn ai_image(req: AiImageRequest) -> Result<AiImageResult, String> {
+    if req.base_url.trim().is_empty() {
+        return Err("未配置 API 地址（Base URL）".into());
+    }
+    if req.api_key.trim().is_empty() {
+        return Err("未配置 API Key，请到「AI 设置」中填写".into());
+    }
+    if req.model.trim().is_empty() {
+        return Err("未配置生图模型".into());
+    }
+    if req.prompt.trim().is_empty() {
+        return Err("图片描述为空".into());
+    }
+
+    let mut body = serde_json::json!({
+        "model": req.model,
+        "prompt": req.prompt,
+        "n": req.n.max(1).min(4),
+    });
+    if let Some(s) = req.size.as_deref() {
+        if !s.trim().is_empty() {
+            body["size"] = serde_json::json!(s.trim());
+        }
+    }
+
+    let resp = client()?
+        .post(endpoint(&req.base_url, "images/generations"))
+        .bearer_auth(req.api_key.trim())
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败：{}", e))?;
+
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("读取响应失败：{}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("HTTP {}：{}", status.as_u16(), truncate(&text, 400)));
+    }
+
+    let value: serde_json::Value =
+        serde_json::from_str(&text).map_err(|_| format!("响应不是合法 JSON：{}", truncate(&text, 300)))?;
+
+    let mut urls = Vec::new();
+    if let Some(arr) = value["data"].as_array() {
+        for item in arr {
+            if let Some(u) = item["url"].as_str() {
+                urls.push(u.to_string());
+            } else if let Some(b) = item["b64_json"].as_str() {
+                urls.push(format!("data:image/png;base64,{}", b));
+            }
+        }
+    }
+    if urls.is_empty() {
+        return Err(format!("API 未返回图片数据：{}", truncate(&text, 300)));
+    }
+
+    Ok(AiImageResult {
+        urls,
+        model: req.model,
+    })
+}
+
 /// 调用 OpenAI 兼容的 chat/completions
 #[tauri::command]
 pub async fn ai_chat(req: AiChatRequest) -> Result<AiChatResult, String> {
