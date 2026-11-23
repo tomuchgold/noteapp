@@ -1810,23 +1810,23 @@ button.link {
 }
 
 /* ================= v0.10 移动端（Android / 窄屏） ================= */
-/* 手机竖屏：侧栏与文件列表变成覆盖式抽屉，菜单栏横向滚动，编辑区占满 */
+/* 手机竖屏：侧栏与文件列表变成覆盖式抽屉，菜单栏换行+最小间距（按钮全部可见），编辑区占满 */
 
 @media (max-width: 820px) {
   .menubar {
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
-    padding: 2px 4px;
-    scrollbar-width: none;
-  }
-  .menubar::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    padding: 2px 3px;
+    gap: 1px;
   }
   .menubar button {
-    flex-shrink: 0;
-    padding: 6px 8px;
-    font-size: calc(12px * var(--ui-scale, 1));
+    padding: 4px 5px;
+    font-size: calc(11px * var(--ui-scale, 1));
+  }
+  .menubar .m-ico {
+    margin-right: 1px;
+  }
+  .menubar .menubar-sep {
+    display: none;
   }
   .menubar .recent-select {
     display: none;

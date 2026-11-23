@@ -123,15 +123,22 @@ await page.locator(".modal-mask button", { hasText: "完成" }).first().click();
 await page.waitForTimeout(200);
 check("收纳按钮/下拉仍未出现", (await page.locator(".menubar-more, .menubar-overflow").count()) === 0);
 
-// ---------- 6. 极窄 430px：菜单栏横向滚动仍可用 ----------
+// ---------- 6. 极窄 430px：菜单栏换行、按钮全部可见 ----------
 await page.setViewportSize({ width: 430, height: 800 });
 await page.waitForTimeout(300);
-const mb430 = await page.locator(".menubar").evaluate((el) => ({
-  scrollable: el.scrollWidth >= el.clientWidth - 2,
-  visible: el.offsetHeight > 20,
-}));
-check("430px 菜单栏仍可见", mb430.visible, JSON.stringify(mb430));
-check("430px 菜单栏横向滚动（不被截断丢失）", mb430.scrollable);
+const mb430 = await page.locator(".menubar").evaluate((el) => {
+  const btns = Array.from(el.querySelectorAll(":scope > button")).filter((b) => {
+    // menubar-secondary（打印/网站）在窄屏为设计隐藏，不算截断
+    return getComputedStyle(b).display !== "none";
+  });
+  const clipped = btns.filter((b) => {
+    const r = b.getBoundingClientRect();
+    return r.width === 0 || r.left < 0 || r.right > window.innerWidth + 1;
+  });
+  return { wrap: getComputedStyle(el).flexWrap, clipped: clipped.length, hidden: btns.length === 0 ? -1 : undefined };
+});
+check("430px 菜单栏换行显示", mb430.wrap === "wrap", JSON.stringify(mb430));
+check("430px 无按钮被截断", mb430.clipped === 0);
 
 // ---------- 7. WebView 默认右键菜单已禁用（contextmenu preventDefault） ----------
 const ctxPrevented = await page.evaluate(() => {
@@ -140,6 +147,64 @@ const ctxPrevented = await page.evaluate(() => {
   return ev.defaultPrevented;
 });
 check("右键默认菜单被阻止（无共享→tauri.localhost）", ctxPrevented);
+
+// ---------- 8. 点击标签栏空白新建 + 光标自动落编辑区 ----------
+await page.setViewportSize({ width: 1600, height: 940 });
+await page.waitForTimeout(300);
+const tabsBefore = await page.locator(".tabbar .tab").count();
+await page.locator(".tabbar").click({ position: { x: 600, y: 12 } });
+await page.waitForTimeout(300);
+const tabsAfter = await page.locator(".tabbar .tab").count();
+check("点击标签栏空白 → 新建标签", tabsAfter === tabsBefore + 1, `${tabsBefore} -> ${tabsAfter}`);
+const focused = await page.evaluate(() => !!document.activeElement?.closest(".cm-content"));
+check("新建后光标落在编辑区", focused);
+// 新文件菜单栏手动聚焦兜底时也算：直接查 cm-content 是否可编辑
+const editable = await page.evaluate(() => document.querySelector(".cm-content")?.getAttribute("contenteditable") === "true");
+check("编辑区可输入", editable);
+
+// ---------- 9. 「打开方式」文件关联：未知扩展（.ini）冷启动也能打开 ----------
+const page2 = await (await browser.newContext({ viewport: { width: 1400, height: 900 } })).newPage();
+await page2.addInitScript(() => {
+  window.__FS__ = {
+    "/demo/x.ini": { content: "[a]\nb=1\n", mtime: 2 },
+  };
+  window.__TAURI_INTERNALS__ = {
+    transformCallback: (cb) => cb,
+    invoke: (cmd, args) => {
+      if (cmd === "opened_urls") return Promise.resolve(["/demo/x.ini"]);
+      if (cmd === "read_text_file") {
+        const f = window.__FS__[args.path];
+        if (!f) return Promise.reject("not found");
+        return Promise.resolve({ content: f.content, encoding: "UTF-8", bom: false, eol: "LF", size: f.content.length });
+      }
+      if (cmd === "file_info") {
+        const f = window.__FS__[args.path];
+        if (!f) return Promise.reject("not found");
+        return Promise.resolve({ size: f.content.length, mtime: f.mtime });
+      }
+      if (cmd === "path_is_dir") return Promise.resolve(false);
+      return Promise.resolve(null);
+    },
+    metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main", windowLabel: "main" } },
+    unregisterListener: () => {},
+    registerListener: () => {},
+  };
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+  window.matchMedia =
+    window.matchMedia ||
+    (() => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }));
+  localStorage.setItem(
+    "notepp.library",
+    JSON.stringify([{ path: "/demo/x.ini", name: "x.ini", category: null, favorite: false, lastOpened: 1, preview: "" }])
+  );
+});
+await page2.goto("http://localhost:5232/", { waitUntil: "networkidle" });
+await page2.waitForTimeout(800);
+const iniTab = page2.locator(".tabbar .tab", { hasText: "x.ini" });
+check("「打开方式」.ini 冷启动自动开标签", (await iniTab.count()) === 1);
+const iniContent = await page2.evaluate(() => document.querySelector(".cm-content")?.textContent ?? "");
+check(".ini 内容已载入编辑器", iniContent.includes("[a]"));
+await page2.close();
 
 console.log(`\n===== v022: ${results.filter((r) => r.ok).length}/${results.length} PASS =====`);
 await browser.close();

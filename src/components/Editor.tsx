@@ -466,6 +466,8 @@ export default function Editor({
       }),
     });
     viewRef.current = view;
+    // 挂载即聚焦：新建标签 / 切换标签后光标直接落在编辑区
+    requestAnimationFrame(() => view.focus());
     // Ctrl/⌘ + 滚轮 缩放字体
     const onWheel = (e: WheelEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;

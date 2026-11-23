@@ -103,7 +103,7 @@ import {
   type Annotation,
   type AnnotationKind,
 } from "./lib/annotations";
-import { EXT_LANG, commentTokens } from "./lib/lang";
+import { commentTokens } from "./lib/lang";
 import {
   VIRTUAL,
   filterFiles,
@@ -888,8 +888,8 @@ export default function App() {
   const isTextFilePath = (p: string): boolean => {
     const ext = (p.split(/[\\/]/).pop()?.split(".").pop() ?? "").toLowerCase();
     if (MEDIA_IMG.has(ext) || MEDIA_AUDIO.has(ext) || MEDIA_VIDEO.has(ext)) return false;
-    if (!ext) return true; // 无扩展名按文本处理
-    return ext in EXT_LANG; // 已知文本类型打开；其他（pdf/zip 等）当附件插入引用
+    // 其余一律按文本尝试（v0.22.3：ini/cfg/csv/toml 等文件关联注册的扩展此前被误拦）
+    return true;
   };
 
 
@@ -2052,6 +2052,7 @@ export default function App() {
             activeId={activeId}
             onSelect={setActiveId}
             onClose={closeTab}
+            onNewTab={newTab}
           />
 
         <div className="editor-row">
