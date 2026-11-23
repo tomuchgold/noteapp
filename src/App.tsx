@@ -1803,9 +1803,13 @@ export default function App() {
     };
     window.addEventListener("click", hide);
     window.addEventListener("blur", hide);
+    // 禁用 WebView 自带右键菜单（其「共享」会指向 tauri.localhost），应用内区域均有自定义菜单
+    const noNative = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("contextmenu", noNative);
     return () => {
       window.removeEventListener("click", hide);
       window.removeEventListener("blur", hide);
+      document.removeEventListener("contextmenu", noNative);
     };
   }, []);
 

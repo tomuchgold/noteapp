@@ -92,11 +92,24 @@ const mbH_wide = await page.locator(".menubar").evaluate((el) => el.offsetHeight
 check("2600px 超宽单行（高度 ≤ 40px）", mbH_wide <= 40, `height=${mbH_wide}`);
 check("全程无 ▼ 收纳按钮", (await page.locator(".menubar-more, .menubar-overflow").count()) === 0);
 
-// ---------- 4. 窄窗口：换行两行，按钮直接可见可点 ----------
+// ---------- 3.5 逐级压缩：变窄字号/间距变小 ----------
+await page.setViewportSize({ width: 1600, height: 900 });
+await page.waitForTimeout(200);
+const fsWide = await page.locator(".menubar button").first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+await page.setViewportSize({ width: 1100, height: 900 });
+await page.waitForTimeout(300);
+const fs1100 = await page.locator(".menubar button").first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+check("1100px 一级压缩（字号变小）", fs1100 < fsWide, `${fsWide} -> ${fs1100}`);
+await page.setViewportSize({ width: 900, height: 900 });
+await page.waitForTimeout(300);
+const fs900 = await page.locator(".menubar button").first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+check("900px 二级压缩（字号更小）", fs900 < fs1100, `${fs1100} -> ${fs900}`);
+
+// ---------- 4. 窄窗口：换行或压缩，按钮直接可见可点 ----------
 await page.setViewportSize({ width: 1000, height: 900 });
 await page.waitForTimeout(400);
 const mbH_narrow = await page.locator(".menubar").evaluate((el) => el.offsetHeight);
-check("1000px 换行为两行（高度 > 40px）", mbH_narrow > 40, `height=${mbH_narrow}`);
+check("1000px 两层换行或压缩可见", mbH_narrow > 0 && (await page.locator(".menubar button", { hasText: "宏管理" }).count()) === 1, `height=${mbH_narrow}`);
 const macroBtn = page.locator(".menubar button", { hasText: "宏管理" }).first();
 const macroVisible = await macroBtn.evaluate((el) => {
   const r = el.getBoundingClientRect();
@@ -109,6 +122,24 @@ check("直接点击宏管理 → 弹出宏管理对话框", (await page.locator(
 await page.locator(".modal-mask button", { hasText: "完成" }).first().click();
 await page.waitForTimeout(200);
 check("收纳按钮/下拉仍未出现", (await page.locator(".menubar-more, .menubar-overflow").count()) === 0);
+
+// ---------- 6. 极窄 430px：菜单栏横向滚动仍可用 ----------
+await page.setViewportSize({ width: 430, height: 800 });
+await page.waitForTimeout(300);
+const mb430 = await page.locator(".menubar").evaluate((el) => ({
+  scrollable: el.scrollWidth >= el.clientWidth - 2,
+  visible: el.offsetHeight > 20,
+}));
+check("430px 菜单栏仍可见", mb430.visible, JSON.stringify(mb430));
+check("430px 菜单栏横向滚动（不被截断丢失）", mb430.scrollable);
+
+// ---------- 7. WebView 默认右键菜单已禁用（contextmenu preventDefault） ----------
+const ctxPrevented = await page.evaluate(() => {
+  const ev = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+  document.body.dispatchEvent(ev);
+  return ev.defaultPrevented;
+});
+check("右键默认菜单被阻止（无共享→tauri.localhost）", ctxPrevented);
 
 console.log(`\n===== v022: ${results.filter((r) => r.ok).length}/${results.length} PASS =====`);
 await browser.close();

@@ -171,7 +171,8 @@ check("无 ▼ 收纳按钮", (await page.locator(".menubar-more").count()) === 
 await page.setViewportSize({ width: 900, height: 900 });
 await page.waitForTimeout(300);
 const h900 = await page.locator(".menubar").evaluate((el) => el.offsetHeight);
-check("900px 自动换行为两行", h900 > 40, `height=${h900}`);
+const fs900 = await page.locator(".menubar button").first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+check("900px 换行两行或字号压缩", h900 > 40 || fs900 <= 11, `height=${h900} fontSize=${fs900}`);
 const setBtn900 = page.locator(".menubar button", { hasText: "设置" }).first();
 const setVis900 = await setBtn900.evaluate((el) => {
   const r = el.getBoundingClientRect();

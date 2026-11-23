@@ -87,13 +87,13 @@ body {
   flex: 1;
 }
 
-/* 菜单栏（v0.22.1：两层自适应换行；显示模式 emoji/文字可切） */
+/* 菜单栏（v0.22.2：两层自适应换行 + 宽度逐级压缩；显示模式 emoji/文字可切） */
 .menubar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 3px;
-  padding: 3px 6px;
+  gap: 2px;
+  padding: 2px 5px;
   background: var(--ui-panel);
   border-bottom: 1px solid var(--ui-border);
   user-select: none;
@@ -117,6 +117,22 @@ body {
   cursor: pointer;
   font-size: calc(12.5px * var(--ui-scale, 1));
   white-space: nowrap;
+}
+
+/* 桌面端逐级压缩（notepad++ 式）：越窄间距/字号越小，按钮始终可见 */
+@media (min-width: 821px) and (max-width: 1150px) {
+  .menubar { gap: 1px; padding: 2px 3px; }
+  .menubar button { padding: 3px 5px; font-size: calc(11.5px * var(--ui-scale, 1)); }
+  .menubar .m-ico { margin-right: 2px; }
+  .menubar .menubar-sep { margin: 3px 2px; }
+}
+@media (min-width: 821px) and (max-width: 980px) {
+  .menubar button { padding: 2px 4px; font-size: calc(10.5px * var(--ui-scale, 1)); }
+}
+@media (min-width: 821px) and (max-width: 860px) {
+  .menubar button { padding: 2px 3px; font-size: calc(10px * var(--ui-scale, 1)); }
+  .menubar .m-ico { margin-right: 1px; }
+  .menubar .recent-select { max-width: 90px; }
 }
 
 .menubar button:hover {
