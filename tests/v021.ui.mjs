@@ -17,6 +17,20 @@ const check = (name, cond, extra = "") => {
   if (!cond) process.exitCode = 1;
 };
 
+/** 点菜单栏按钮：优先直点，被收纳进 ▼ 时走下拉 */
+async function menuBtn(page, text) {
+  const btn = page.locator(".menubar button", { hasText: text }).first();
+  try {
+    await btn.click({ timeout: 2500 });
+    return;
+  } catch {
+    await page.locator(".menubar-more").click();
+    await page.waitForTimeout(200);
+    await page.locator(".menubar-overflow button", { hasText: text }).first().click();
+    await page.waitForTimeout(100);
+  }
+}
+
 const server = await createServer({ root: "/workspace/notepp", server: { port: 5230 } });
 await server.listen();
 const browser = await chromium.launch({ executablePath: "/usr/bin/chromium", headless: true });
@@ -127,7 +141,7 @@ check(
 );
 
 // ---------- 5. 设置切换搜索引擎为百度 ----------
-await page.locator(".menubar button", { hasText: "设置" }).first().click();
+await menuBtn(page, "设置");
 await page.waitForTimeout(300);
 const engRow = page.locator(".modal.settings .setting-row", { hasText: "Web 搜索引擎" });
 check("设置含 Web 搜索引擎下拉", (await engRow.count()) === 1);
@@ -151,19 +165,17 @@ check(
 );
 
 // ---------- 6. 菜单栏紧凑化：flex-wrap + 窄窗口自动换行 ----------
-const wrap = await page.locator(".menubar").evaluate((el) => getComputedStyle(el).flexWrap);
-check("菜单栏 flex-wrap 生效", wrap === "wrap", wrap);
-const noOverflow = await page.locator(".menubar").evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
-check("1440px 宽度下菜单无横向溢出", noOverflow);
+const ow = await page.locator(".menubar").evaluate((el) => getComputedStyle(el).overflow);
+check("菜单栏单行收纳（overflow hidden）", ow === "hidden", ow);
+check("1440px 溢出按钮收纳进 ▼", (await page.locator(".menubar-more").count()) === 1);
 await page.setViewportSize({ width: 900, height: 900 });
 await page.waitForTimeout(300);
-const rows = await page.locator(".menubar").evaluate((el) => {
-  const btns = Array.from(el.querySelectorAll("button")).filter((b) => b.offsetParent !== null);
-  const tops = new Set(btns.map((b) => Math.round(b.getBoundingClientRect().top)));
-  return { rows: tops.size, overflow: el.scrollWidth > el.clientWidth + 2 };
-});
-check("900px 宽度下菜单折成多行", rows.rows >= 2, `rows=${rows.rows}`);
-check("900px 宽度下菜单无遮挡（无横向溢出）", !rows.overflow);
+check("900px 溢出按钮收纳进 ▼", (await page.locator(".menubar-more").count()) === 1);
+await page.locator(".menubar-more").click();
+await page.waitForTimeout(250);
+check("900px ▼ 下拉含被收纳的「设置」", (await page.locator(".menubar-overflow button", { hasText: "设置" }).count()) === 1);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
 
 console.log(`\n===== v021: ${results.filter((r) => r.ok).length}/${results.length} PASS =====`);
 await browser.close();

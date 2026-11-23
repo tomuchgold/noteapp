@@ -15,6 +15,20 @@ const check = (name, cond, extra = "") => {
   if (!cond) process.exitCode = 1;
 };
 
+/** 点菜单栏按钮：优先直点，被收纳进 ▼ 时走下拉 */
+async function menuBtn(page, text) {
+  const btn = page.locator(".menubar button", { hasText: text }).first();
+  try {
+    await btn.click({ timeout: 2500 });
+    return;
+  } catch {
+    await page.locator(".menubar-more").click();
+    await page.waitForTimeout(200);
+    await page.locator(".menubar-overflow button", { hasText: text }).first().click();
+    await page.waitForTimeout(100);
+  }
+}
+
 const server = await createServer({ root: "/workspace/notepp", server: { port: 5218 } });
 await server.listen();
 const browser = await chromium.launch({ executablePath: "/usr/bin/chromium", headless: true });
@@ -88,7 +102,7 @@ check("查找词自动带入选中文本", qval.trim() === "hello", `q="${qval}"
 await page.keyboard.press("Escape");
 
 // ---------- 2/3. 标注面板 ----------
-await page.locator(".menubar button", { hasText: "标注" }).first().click();
+await menuBtn(page, "标注");
 await page.waitForTimeout(200);
 check("标注面板打开", await page.locator(".anno-panel").isVisible());
 check("标注面板有显眼关闭按钮", (await page.locator(".anno-panel-close", { hasText: "关闭" }).count()) === 1);
@@ -110,7 +124,7 @@ await page.waitForTimeout(150);
 check("点击关闭按钮后面板消失", !(await page.locator(".anno-panel").isVisible().catch(() => false)));
 
 // ---------- 4. 设置里的 TTS ----------
-await page.locator(".menubar button", { hasText: "设置" }).first().click();
+await menuBtn(page, "设置");
 await page.waitForSelector(".modal.settings");
 check("设置含朗读引擎选择", (await page.locator(".modal.settings select").count()) >= 1);
 const settingText = await page.locator(".modal.settings").innerText();

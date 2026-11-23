@@ -34,6 +34,8 @@ export interface EditorSettings {
   renderMedia: boolean;
   /** 右键「在 Web 搜索」使用的搜索引擎 */
   webSearch: "bing" | "google" | "baidu" | "duckduckgo";
+  /** 菜单栏显示模式：both=emoji+文字（默认）；emoji=只显示图标；text=只显示文字 */
+  menuDisplay: "both" | "emoji" | "text";
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   mediaMode: "copy",
   renderMedia: true,
   webSearch: "bing",
+  menuDisplay: "both",
 };
 
 /** 界面/查找字号倍率范围 */
@@ -105,6 +108,7 @@ export function clampSettings(s: EditorSettings): EditorSettings {
     mediaMode: s.mediaMode === "relative" ? "relative" : "copy",
     renderMedia: !!s.renderMedia,
     webSearch: (["bing", "google", "baidu", "duckduckgo"].includes(s.webSearch) ? s.webSearch : "bing") as EditorSettings["webSearch"],
+    menuDisplay: (["both", "emoji", "text"].includes(s.menuDisplay) ? s.menuDisplay : "both") as EditorSettings["menuDisplay"],
   };
 }
 

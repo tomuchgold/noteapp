@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Editor from "./components/Editor";
@@ -1800,6 +1800,7 @@ export default function App() {
       const menu = document.getElementById("tab-context-menu");
       if (menu) menu.style.display = "none";
       setTransformOpen(false);
+      setOverflowOpen(false);
     };
     window.addEventListener("click", hide);
     window.addEventListener("blur", hide);
@@ -1812,208 +1813,216 @@ export default function App() {
   const lang = detectLanguage(activeTab?.path ?? null);
   const lines = activeTab ? activeTab.content.split("\n").length : 0;
 
+  // ---------- v0.22 菜单栏：数据驱动（emoji/文字显示模式 + 溢出折叠「▼」） ----------
+  const menubarRef = useRef<HTMLDivElement>(null);
+  const [overflowed, setOverflowed] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  useEffect(() => {
+    const el = menubarRef.current;
+    if (!el) return;
+    const calc = () => {
+      // 非「▼」的菜单内容（按钮 + 变换下拉容器），任一右边缘超出可视宽度即收纳
+      const kids = Array.from(
+        el.querySelectorAll<HTMLElement>(":scope > button, :scope > span.menu-drop-wrap")
+      ).filter((b) => b.offsetParent !== null && !b.classList.contains("menubar-more-wrap"));
+      const hid = kids.some((b) => b.offsetLeft + b.offsetWidth > el.clientWidth - 8);
+      setOverflowed(hid);
+    };
+    calc();
+    const ro = new ResizeObserver(calc);
+    ro.observe(el);
+    window.addEventListener("resize", calc);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", calc);
+    };
+  }, []);
+
+  /** 菜单项渲染：图标 + 文字（顺序可倒），显示模式由 CSS 类控制 */
+  const mbContent = (it: { ico?: string; txt?: string; icoAfter?: boolean }): ReactNode => (
+    <>
+      {it.ico && !it.icoAfter && <span className="m-ico">{it.ico}</span>}
+      {it.txt && <span className="m-txt">{it.txt}</span>}
+      {it.ico && it.icoAfter && <span className="m-ico">{it.ico}</span>}
+    </>
+  );
+
+  interface MbItem {
+    sep?: true;
+    ico?: string;
+    txt?: string;
+    icoAfter?: boolean;
+    title?: string;
+    onClick?: () => void;
+    disabled?: boolean;
+    on?: boolean;
+    rec?: boolean;
+    cls?: string;
+    /** 该项自带下拉（变换菜单） */
+    drop?: ReactNode;
+  }
+
+  const TRANSFORM_ITEMS = [
+    { id: "transform-upper", label: "转为大写" },
+    { id: "transform-lower", label: "转为小写" },
+    { id: "transform-title", label: "首字母大写" },
+    { id: "transform-sort", label: "行排序 A→Z" },
+    { id: "transform-sort-desc", label: "行排序 Z→A" },
+    { id: "transform-dedupe", label: "去除重复行" },
+    { id: "transform-trim", label: "去除行首尾空格" },
+  ];
+
+  const transformDrop = (
+    <div className="context-menu transform-menu" onClick={(e) => e.stopPropagation()}>
+      {TRANSFORM_ITEMS.map((it) => (
+        <button
+          key={it.id}
+          onClick={() => {
+            setTransformOpen(false);
+            executeCommand(it.id);
+          }}
+          title={BUILTIN_COMMANDS.find((c) => c.id === it.id)?.desc}
+        >
+          {it.label}
+          {shortcutOf(it.id) && <span className="menu-key"> {shortcutOf(it.id)}</span>}
+        </button>
+      ))}
+    </div>
+  );
+
+  const menuItems: MbItem[] = [
+    { ico: "📄", txt: "新建", title: "新建空白标签 (Ctrl+N)", onClick: newTab },
+    { ico: "📂", txt: "打开", title: "打开文件", onClick: openDialog },
+    { ico: "💾", txt: "保存", title: "保存 (Ctrl+S)", onClick: () => activeTab && saveTab(activeTab) },
+    { ico: "📥", txt: "另存为", title: "另存为 (Ctrl+Shift+S)", onClick: () => activeTab && saveTab(activeTab, true) },
+    { ico: "🔀", txt: "对比", title: "两个文件逐行对比", onClick: () => setDiffDialog(true) },
+    { ico: "🔍", txt: "查找", title: "查找替换 (Ctrl+F，F3 下一处，Shift+F3 反向)", onClick: openFind },
+    { sep: true },
+    { ico: "🕐", txt: "时间", title: "插入当前日期时间 (Ctrl+Alt+D)", disabled: !activeTab, onClick: () => insertDateTime("datetime") },
+    { ico: "💬", txt: "注释", title: "按当前文件类型插入行注释 (Ctrl+Alt+C)", disabled: !activeTab, onClick: () => insertComment(false) },
+    { ico: "🔠", txt: "变换 ▾", title: "文字变换：大小写转换、行排序、去重、去行首尾空格", disabled: !activeTab, on: transformOpen, drop: transformDrop },
+    { ico: "✖️", txt: "关闭", title: "关闭当前标签 (Ctrl+W)", onClick: () => activeId && closeTab(activeId) },
+    { sep: true },
+    { ico: "⏺️", txt: recording ? `停止录制 ●${macroLen}` : "录制宏", title: "录制编辑动作 (Ctrl+Shift+R)", rec: recording, onClick: toggleRecord },
+    { ico: "▶️", txt: "回放宏", icoAfter: true, title: `回放宏 (Ctrl+Shift+P)${macroLen ? `，共 ${macroLen} 个动作` : "，尚未录制"}`, disabled: recording || macroLen === 0, onClick: replayMacro },
+    { ico: "📜", txt: "宏管理", title: "宏管理：保存当前录制为命名宏、回放/重命名/删除、导入导出 JSON", onClick: () => setMacroDialogOpen(true) },
+    { ico: "🧩", txt: "片段", title: "片段/模板管理：输入缩写后按 Tab 展开，支持 ${NOW}/${DATE}/${TIME}", onClick: () => setSnippetDialogOpen(true) },
+    { ico: "⌨️", txt: "快捷键", title: "快捷键设置：内置命令、宏、片段均可自定义按键", onClick: () => openKeymapFor() },
+    { sep: true },
+    { ico: "🗂️", txt: "侧栏", title: "显示/隐藏侧栏 (Ctrl+B)", on: layout.sidebarOpen, onClick: () => patchLayout({ sidebarOpen: !layout.sidebarOpen }) },
+    { ico: "📋", txt: "列表", title: "显示/隐藏文件列表 (Ctrl+Shift+B)", on: layout.filelistOpen, onClick: () => patchLayout({ filelistOpen: !layout.filelistOpen }) },
+    { ico: "📊", txt: "表格", title: "在光标处插入 Markdown 表格", disabled: !activeTab, onClick: () => setTableOpen(true) },
+    { ico: "🖼️", txt: "媒体", title: "插入媒体/附件：选择图片、音频、视频或任意文件，按设置的归档策略插入引用（右键编辑区也可插入）", disabled: !activeTab, onClick: () => void pickAndInsertMedia() },
+    { ico: imgGenerating ? "⏳" : "🎨", txt: imgGenerating ? "生图…" : "生图", title: "AI 生图：输入描述生成图片并在光标处插入引用（需在 AI 设置中填好生图模型）", disabled: !activeTab || imgGenerating, onClick: () => void handleImageGen() },
+    { ico: "👁️", txt: "预览", title: "Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览", disabled: !activeTab, on: previewOpen, onClick: () => setPreviewOpen(true) },
+    { ico: "🖨️", txt: "打印", title: "打印 / 导出 PDF（按当前缩放字号；打印对话框里选「另存为 PDF」）", disabled: !activeTab, cls: "menubar-secondary", onClick: doPrint },
+    { ico: "🖍️", txt: "标注", title: "标注导航：当前文件所有划线/高亮/备注列表，点击跳转", disabled: !activeTab, on: annoOpen, onClick: () => setAnnoOpen((v) => !v) },
+    { ico: "↔️", txt: "分屏", title: "分屏对照：左右同时查看两个文件（再次点击关闭）", on: !!splitId, onClick: toggleSplit },
+    { sep: true },
+    { ico: "⚙️", txt: "设置", title: "编辑器样式设置：字号/主题/行高/高亮颜色等", onClick: () => setSettingsOpen(true) },
+    { ico: "▦", txt: "列选", title: "列编辑模式：矩形选区 + 十字光标（Alt+拖拽也可多行同时编辑）", on: columnMode, onClick: () => setColumnMode((v) => !v) },
+    { ico: "🔄", txt: "更新", title: updateInfo?.newer ? `发现新版本 v${updateInfo.latest}` : "检查更新", on: !!updateInfo?.newer, onClick: () => { setUpdateOpen(true); void doCheckUpdate(); } },
+    { ico: "🤖", txt: "AI", title: aiReady ? `AI 已就绪：${resolveConfig(aiConfig).model}` : "配置 AI 服务商与 Key", on: aiReady, onClick: () => setAiSettingsOpen(true) },
+    { ico: "🌐", txt: "我的网站", title: "访问官网 notepp.ambook.vip（在系统浏览器中打开）", cls: "menubar-secondary", onClick: () => void openUrl("https://notepp.ambook.vip") },
+  ];
+
   return (
     <div className="app">
-      {/* 菜单栏 */}
-      <div className="menubar">
-        <button onClick={newTab} title="新建空白标签 (Ctrl+N)">📄 新建</button>
-        <button onClick={openDialog} title="打开文件">📂 打开</button>
-        <button onClick={() => activeTab && saveTab(activeTab)} title="保存 (Ctrl+S)">💾 保存</button>
-        <button onClick={() => activeTab && saveTab(activeTab, true)} title="另存为 (Ctrl+Shift+S)">📥 另存为</button>
-        <button onClick={() => setDiffDialog(true)} title="两个文件逐行对比">🔀 对比</button>
-        <button onClick={() => openFind()} title="查找替换 (Ctrl+F，F3 下一处，Shift+F3 反向)">
-          🔍 查找
-        </button>
-        <span className="menubar-sep" />
-        <button
-          onClick={() => insertDateTime("datetime")}
-          disabled={!activeTab}
-          title="插入当前日期时间 (Ctrl+Alt+D)"
-        >
-          🕐 时间
-        </button>
-        <button
-          onClick={() => insertComment(false)}
-          disabled={!activeTab}
-          title="按当前文件类型插入行注释 (Ctrl+Alt+C)"
-        >
-          💬 注释
-        </button>
-        <span className="menu-drop-wrap">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setTransformOpen((v) => !v);
-            }}
-            disabled={!activeTab}
-            className={transformOpen ? "on" : ""}
-            title="文字变换：大小写转换、行排序、去重、去行首尾空格"
-          >
-            🔠 变换 ▾
-          </button>
-          {transformOpen && (
-            <div className="context-menu transform-menu" onClick={(e) => e.stopPropagation()}>
-              {[
-                { id: "transform-upper", label: "转为大写" },
-                { id: "transform-lower", label: "转为小写" },
-                { id: "transform-title", label: "首字母大写" },
-                { id: "transform-sort", label: "行排序 A→Z" },
-                { id: "transform-sort-desc", label: "行排序 Z→A" },
-                { id: "transform-dedupe", label: "去除重复行" },
-                { id: "transform-trim", label: "去除行首尾空格" },
-              ].map((it) => (
-                <button
-                  key={it.id}
-                  onClick={() => {
-                    setTransformOpen(false);
-                    executeCommand(it.id);
-                  }}
-                  title={BUILTIN_COMMANDS.find((c) => c.id === it.id)?.desc}
-                >
-                  {it.label}
-                  {shortcutOf(it.id) && <span className="menu-key"> {shortcutOf(it.id)}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </span>
-        <button onClick={() => activeId && closeTab(activeId)} title="关闭当前标签 (Ctrl+W)">✖️ 关闭</button>
-        <span className="menubar-sep" />
-        <button
-          onClick={toggleRecord}
-          className={recording ? "rec-active" : ""}
-          title="录制编辑动作 (Ctrl+Shift+R)"
-        >
-          {recording ? `⏺️ 停止录制 ●${macroLen}` : "⏺️ 录制宏"}
-        </button>
-        <button
-          onClick={replayMacro}
-          disabled={recording || macroLen === 0}
-          title={`回放宏 (Ctrl+Shift+P)${macroLen ? `，共 ${macroLen} 个动作` : "，尚未录制"}`}
-        >
-          回放宏 ▶️
-        </button>
-        <button
-          onClick={() => setMacroDialogOpen(true)}
-          title="宏管理：保存当前录制为命名宏、回放/重命名/删除、导入导出 JSON"
-        >
-          📜 宏管理
-        </button>
-        <button
-          onClick={() => setSnippetDialogOpen(true)}
-          title="片段/模板管理：输入缩写后按 Tab 展开，支持 ${NOW}/${DATE}/${TIME}"
-        >
-          🧩 片段
-        </button>
-        <button
-          onClick={() => openKeymapFor()}
-          title="快捷键设置：内置命令、宏、片段均可自定义按键"
-        >
-          ⌨️ 快捷键
-        </button>
-        <span className="menubar-sep" />
-        <button
-          onClick={() => patchLayout({ sidebarOpen: !layout.sidebarOpen })}
-          className={layout.sidebarOpen ? "on" : ""}
-          title="显示/隐藏侧栏 (Ctrl+B)"
-        >
-          🗂️ 侧栏
-        </button>
-        <button
-          onClick={() => patchLayout({ filelistOpen: !layout.filelistOpen })}
-          className={layout.filelistOpen ? "on" : ""}
-          title="显示/隐藏文件列表 (Ctrl+Shift+B)"
-        >
-          📋 列表
-        </button>
-        <button
-          onClick={() => setTableOpen(true)}
-          disabled={!activeTab}
-          title="在光标处插入 Markdown 表格"
-        >
-          📊 表格
-        </button>
-        <button
-          onClick={() => void pickAndInsertMedia()}
-          disabled={!activeTab}
-          title="插入媒体/附件：选择图片、音频、视频或任意文件，按设置的归档策略插入引用（右键编辑区也可插入）"
-        >
-          🖼️ 媒体
-        </button>
-        <button
-          onClick={() => void handleImageGen()}
-          disabled={!activeTab || imgGenerating}
-          title="AI 生图：输入描述生成图片并在光标处插入引用（需在 AI 设置中填好生图模型）"
-        >
-          {imgGenerating ? "⏳ 生图…" : "🎨 生图"}
-        </button>
-        <button
-          onClick={() => setPreviewOpen(true)}
-          disabled={!activeTab}
-          className={previewOpen ? "on" : ""}
-          title="Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览"
-        >
-          👁️ 预览
-        </button>
-        <button
-          onClick={doPrint}
-          disabled={!activeTab}
-          className="menubar-secondary"
-          title="打印 / 导出 PDF（按当前缩放字号；打印对话框里选「另存为 PDF」）"
-        >
-          🖨️ 打印
-        </button>
-        <button
-          onClick={() => setAnnoOpen((v) => !v)}
-          disabled={!activeTab}
-          className={annoOpen ? "on" : ""}
-          title="标注导航：当前文件所有划线/高亮/备注列表，点击跳转"
-        >
-          🖍️ 标注
-        </button>
-        <button
-          onClick={toggleSplit}
-          className={splitId ? "on" : ""}
-          title="分屏对照：左右同时查看两个文件（再次点击关闭）"
-        >
-          ↔️ 分屏
-        </button>
-        <span className="menubar-sep" />
-        <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置：字号/主题/行高/高亮颜色等">
-          ⚙️ 设置
-        </button>
-        <button
-          onClick={() => setColumnMode((v) => !v)}
-          className={columnMode ? "on" : ""}
-          title="列编辑模式：矩形选区 + 十字光标（Alt+拖拽也可多行同时编辑）"
-        >
-          ▦ 列选
-        </button>
-        <button
-          onClick={() => {
-            setUpdateOpen(true);
-            void doCheckUpdate();
-          }}
-          className={updateInfo?.newer ? "on" : ""}
-          title={updateInfo?.newer ? `发现新版本 v${updateInfo.latest}` : "检查更新"}
-        >
-          🔄 更新
-        </button>
-        <button
-          onClick={() => setAiSettingsOpen(true)}
-          className={aiReady ? "on" : ""}
-          title={aiReady ? `AI 已就绪：${resolveConfig(aiConfig).model}` : "配置 AI 服务商与 Key"}
-        >
-          🤖 AI
-        </button>
-        <button
-          className="menubar-secondary"
-          onClick={() => void openUrl("https://notepp.ambook.vip")}
-          title="访问官网 notepp.ambook.vip（在系统浏览器中打开）"
-        >
-          🌐 我的网站
-        </button>
+      {/* 菜单栏（v0.22：数据驱动 + 显示模式 + 溢出折叠「▼」） */}
+      <div
+        ref={menubarRef}
+        className={`menubar menu-${editorSettings.menuDisplay}${overflowed ? " has-more" : ""}`}
+      >
+        {menuItems.map((it, i) =>
+          it.sep ? (
+            <span key={`s${i}`} className="menubar-sep" />
+          ) : it.drop ? (
+            <span key={i} className="menu-drop-wrap">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTransformOpen((v) => !v);
+                }}
+                disabled={it.disabled}
+                className={it.on ? "on" : ""}
+                title={it.title}
+              >
+                {mbContent(it)}
+              </button>
+              {transformOpen && it.drop}
+            </span>
+          ) : (
+            <button
+              key={i}
+              onClick={it.onClick}
+              disabled={it.disabled}
+              className={[it.on ? "on" : "", it.rec ? "rec-active" : "", it.cls ?? ""].filter(Boolean).join(" ") || undefined}
+              title={it.title}
+            >
+              {mbContent(it)}
+            </button>
+          )
+        )}
         <span className="spacer" />
+        {overflowed && (
+          <span className="menu-drop-wrap menubar-more-wrap">
+            <button
+              className="menubar-more"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOverflowOpen((v) => !v);
+              }}
+              title="更多菜单项（窗口较窄，其余按钮收纳在此）"
+            >
+              ▼
+            </button>
+            {overflowOpen && (
+              <div className="context-menu menubar-overflow" onClick={(e) => e.stopPropagation()}>
+                {menuItems.map((it, j) =>
+                  it.sep ? (
+                    <span key={`os${j}`} className="overflow-sep" />
+                  ) : it.drop ? (
+                    TRANSFORM_ITEMS.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setOverflowOpen(false);
+                          executeCommand(t.id);
+                        }}
+                        title={BUILTIN_COMMANDS.find((c) => c.id === t.id)?.desc}
+                      >
+                        {t.label}
+                        {shortcutOf(t.id) && <span className="menu-key"> {shortcutOf(t.id)}</span>}
+                      </button>
+                    ))
+                  ) : (
+                    <button
+                      key={j}
+                      onClick={() => {
+                        setOverflowOpen(false);
+                        it.onClick?.();
+                      }}
+                      disabled={it.disabled}
+                      className={it.cls}
+                      title={it.title ?? ""}
+                    >
+                      {mbContent(it)}
+                    </button>
+                  )
+                )}
+                <button
+                  onClick={() => {
+                    setOverflowOpen(false);
+                    setSettingsOpen(true);
+                  }}
+                  title="切换菜单栏显示模式：emoji+文字 / 只 emoji / 只文字"
+                >
+                  🧭 菜单显示模式…
+                </button>
+              </div>
+            )}
+          </span>
+        )}
         {recent.length > 0 && (
           <select
             className="recent-select"

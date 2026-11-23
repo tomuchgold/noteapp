@@ -327,6 +327,15 @@ export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap 
         </div>
 
         <div className="setting-row">
+          <Label icon="🧭" name="菜单显示" tip="菜单栏按钮的显示模式：emoji+文字（默认）、只显示 emoji 图标（最省空间）、只显示文字。窗口较窄放不下时，多余按钮会收纳到右侧「▼」里。" dim={<span className="dim">{value.menuDisplay === "both" ? "emoji + 文字" : value.menuDisplay === "emoji" ? "只显示 emoji" : "只显示文字"}</span>} />
+          <select value={value.menuDisplay} onChange={(e) => set({ menuDisplay: e.target.value as EditorSettings["menuDisplay"] })}>
+            <option value="both">emoji + 文字</option>
+            <option value="emoji">只显示 emoji</option>
+            <option value="text">只显示文字</option>
+          </select>
+        </div>
+
+        <div className="setting-row">
           <Label icon="🌐" name="Web 搜索引擎" tip="编辑器里选中文字右键「在 Web 搜索」时使用的搜索引擎。" dim={<span className="dim">{value.webSearch === "bing" ? "Bing" : value.webSearch === "google" ? "Google" : value.webSearch === "baidu" ? "百度" : "DuckDuckGo"}</span>} />
           <select value={value.webSearch} onChange={(e) => set({ webSearch: e.target.value as EditorSettings["webSearch"] })}>
             <option value="bing">Bing</option>
