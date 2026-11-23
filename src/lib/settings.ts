@@ -32,6 +32,8 @@ export interface EditorSettings {
   mediaMode: "copy" | "relative";
   /** 在编辑器内直接渲染图片缩略图与音频/视频播放控件 */
   renderMedia: boolean;
+  /** 右键「在 Web 搜索」使用的搜索引擎 */
+  webSearch: "bing" | "google" | "baidu" | "duckduckgo";
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
@@ -49,6 +51,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   findScale: 100,
   mediaMode: "copy",
   renderMedia: true,
+  webSearch: "bing",
 };
 
 /** 界面/查找字号倍率范围 */
@@ -101,6 +104,7 @@ export function clampSettings(s: EditorSettings): EditorSettings {
     findScale: clamp(s.findScale, UI_SCALE_MIN, UI_SCALE_MAX, DEFAULT_SETTINGS.findScale),
     mediaMode: s.mediaMode === "relative" ? "relative" : "copy",
     renderMedia: !!s.renderMedia,
+    webSearch: (["bing", "google", "baidu", "duckduckgo"].includes(s.webSearch) ? s.webSearch : "bing") as EditorSettings["webSearch"],
   };
 }
 

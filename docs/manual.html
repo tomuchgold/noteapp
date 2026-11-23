@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.20.1</title>
+<title>NotePP 功能手册 — v0.21.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.20.1</span>
+    <span class="ver-badge">v0.21.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.20.1，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.21.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.20.1</b></span>
+        <span>当前版本 <b>v0.21.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -631,13 +631,13 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.20.1</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.21.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 
       <div class="feature">
         <h3><span class="ic">💾</span>会话恢复</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">重启应用后自动还原上次打开的标签页，接着上次的工作继续。<b>v0.20.1 起：没保存的也不会丢</b>——新建未保存的文件、已保存文件里未落盘的修改，重启后都会原样恢复（单个草稿上限 500KB）。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">重启应用后自动还原上次打开的标签页，接着上次的工作继续。<b>v0.21.0 起：没保存的也不会丢</b>——新建未保存的文件、已保存文件里未落盘的修改，重启后都会原样恢复（单个草稿上限 500KB）。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">无需设置，重新打开应用即自动恢复。</span></div>
         <div class="path"><span class="badge">路径</span>自动生效</div>
       </div>
@@ -655,6 +655,13 @@ graph LR
         <div class="frow"><span class="flabel">归档策略</span><span class="ftext">设置中「🖼️ 媒体归档」可选：<b>自动归档到 media/</b>（默认，推荐，移动文档不丢素材）或<b>相对路径引用</b>（不复制文件，直接引用原位置，适合素材已集中管理的情况）。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">三种插入方式任选；大文件只读模式下不支持插入媒体，会给出提示；文档未保存时会提示先 <kbd>Ctrl+S</kbd> 保存。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「媒体」/ 右键「插入媒体/附件…」/ 拖放媒体文件到编辑器</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔍</span>右键搜索：Web 搜索 / 站内搜索</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">编辑器里<b>选中文字后右键</b>，菜单新增两项：「🌐 在 Web 搜索」用系统浏览器搜索选中文字（默认 Bing）；「🔍 在 NotePP 中搜索」打开查找替换浮窗并自动填入选中文字。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">选中文字 → 右键 → 点任一搜索项。搜索引擎可在「设置 → 🌐 Web 搜索引擎」切换（Bing / Google / 百度 / DuckDuckGo）。</span></div>
+        <div class="path"><span class="badge">路径</span>编辑器选中文字右键 / 设置 → Web 搜索引擎</div>
       </div>
 
       <div class="feature">

@@ -615,6 +615,32 @@ export default function App() {
     setFindOpen(true);
   }, []);
 
+  /** 打开查找栏并填入指定关键词（右键「在 NotePP 中搜索」用） */
+  const openFindWith = useCallback((text: string) => {
+    const kw = text.trim().slice(0, 300);
+    setFindSeed(kw);
+    setFindOpen(true);
+  }, []);
+
+  /** 右键「在 Web 搜索」：按设置的引擎用系统浏览器打开搜索页 */
+  const handleWebSearch = useCallback(
+    (text: string) => {
+      const kw = encodeURIComponent(text.trim());
+      if (!kw) return;
+      const engine = editorSettings.webSearch;
+      const url =
+        engine === "google"
+          ? `https://www.google.com/search?q=${kw}`
+          : engine === "baidu"
+            ? `https://www.baidu.com/s?wd=${kw}`
+            : engine === "duckduckgo"
+              ? `https://duckduckgo.com/?q=${kw}`
+              : `https://www.bing.com/search?q=${kw}`;
+      openUrl(url).catch((e) => alert(`打开浏览器失败：${e}`));
+    },
+    [editorSettings.webSearch]
+  );
+
 
   // ---------- 标注（划线/高亮/备注，按文件路径持久化） ----------
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -1798,6 +1824,7 @@ export default function App() {
         <button onClick={() => openFind()} title="查找替换 (Ctrl+F，F3 下一处，Shift+F3 反向)">
           🔍 查找
         </button>
+        <span className="menubar-sep" />
         <button
           onClick={() => insertDateTime("datetime")}
           disabled={!activeTab}
@@ -1851,6 +1878,7 @@ export default function App() {
           )}
         </span>
         <button onClick={() => activeId && closeTab(activeId)} title="关闭当前标签 (Ctrl+W)">✖️ 关闭</button>
+        <span className="menubar-sep" />
         <button
           onClick={toggleRecord}
           className={recording ? "rec-active" : ""}
@@ -1883,6 +1911,7 @@ export default function App() {
         >
           ⌨️ 快捷键
         </button>
+        <span className="menubar-sep" />
         <button
           onClick={() => patchLayout({ sidebarOpen: !layout.sidebarOpen })}
           className={layout.sidebarOpen ? "on" : ""}
@@ -1949,6 +1978,7 @@ export default function App() {
         >
           ↔️ 分屏
         </button>
+        <span className="menubar-sep" />
         <button onClick={() => setSettingsOpen(true)} title="编辑器样式设置：字号/主题/行高/高亮颜色等">
           ⚙️ 设置
         </button>
@@ -2159,6 +2189,8 @@ export default function App() {
               mediaDir={activeTab.path ? dirName(activeTab.path) : null}
               renderMedia={editorSettings.renderMedia}
               onInsertMedia={() => void pickAndInsertMedia()}
+              onWebSearch={handleWebSearch}
+              onFindInNote={openFindWith}
             />
             </>
           )
@@ -2194,6 +2226,8 @@ export default function App() {
             snippets={snippets}
             mediaDir={splitTab.path ? dirName(splitTab.path) : null}
             renderMedia={editorSettings.renderMedia}
+            onWebSearch={handleWebSearch}
+            onFindInNote={openFindWith}
           />
         </div>
       )}

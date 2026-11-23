@@ -82,6 +82,10 @@ interface Props {
   renderMedia?: boolean;
   /** 右键菜单「插入媒体/附件…」回调 */
   onInsertMedia?: () => void;
+  /** 右键「在 Web 搜索」：用系统浏览器搜索选中文字 */
+  onWebSearch?: (text: string) => void;
+  /** 右键「在 NotePP 中搜索」：打开查找浮窗并填入选中文字 */
+  onFindInNote?: (text: string) => void;
 }
 
 const languageComp = new Compartment();
@@ -353,6 +357,8 @@ export default function Editor({
   mediaDir = null,
   renderMedia = true,
   onInsertMedia,
+  onWebSearch,
+  onFindInNote,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -890,6 +896,33 @@ export default function Editor({
                 }}
               >
                 🖼️ 插入媒体/附件…
+              </button>
+            </>
+          )}
+          {aiMenu.text && (
+            <>
+              <div className="ai-menu-head">搜索</div>
+              <button
+                className="ann-menu-item"
+                title="用系统浏览器搜索选中文字（搜索引擎可在设置中更换）"
+                onClick={() => {
+                  const t = aiMenu.text;
+                  setAiMenu(null);
+                  onWebSearch?.(t);
+                }}
+              >
+                🌐 在 Web 搜索
+              </button>
+              <button
+                className="ann-menu-item"
+                title="在 NotePP 中搜索选中文字（打开查找替换）"
+                onClick={() => {
+                  const t = aiMenu.text;
+                  setAiMenu(null);
+                  onFindInNote?.(t);
+                }}
+              >
+                🔍 在 NotePP 中搜索
               </button>
             </>
           )}

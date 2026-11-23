@@ -327,6 +327,16 @@ export default function SettingsDialog({ value, onChange, onClose, onOpenKeymap 
         </div>
 
         <div className="setting-row">
+          <Label icon="🌐" name="Web 搜索引擎" tip="编辑器里选中文字右键「在 Web 搜索」时使用的搜索引擎。" dim={<span className="dim">{value.webSearch === "bing" ? "Bing" : value.webSearch === "google" ? "Google" : value.webSearch === "baidu" ? "百度" : "DuckDuckGo"}</span>} />
+          <select value={value.webSearch} onChange={(e) => set({ webSearch: e.target.value as EditorSettings["webSearch"] })}>
+            <option value="bing">Bing</option>
+            <option value="google">Google</option>
+            <option value="baidu">百度</option>
+            <option value="duckduckgo">DuckDuckGo</option>
+          </select>
+        </div>
+
+        <div className="setting-row">
           <Label icon="🔊" name="朗读引擎" tip="系统内置：无需配置、离线可用（推荐）；OpenAI 兼容接口：填 API 地址与 Key，用云端音色朗读。" dim={<span className="dim">{tts.engine === "system" ? "系统内置（离线）" : "OpenAI 兼容接口"}</span>} />
           <select value={tts.engine} onChange={(e) => setTtsCfg({ engine: e.target.value as TtsConfig["engine"] })}>
             <option value="system">系统内置（免配置）</option>

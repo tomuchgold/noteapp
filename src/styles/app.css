@@ -87,12 +87,14 @@ body {
   flex: 1;
 }
 
-/* 菜单栏 */
+/* 菜单栏（v0.21：紧凑化 + 自适应换行，窗口变窄自动折成两行/三行，不再遮挡） */
 .menubar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 3px;
+  row-gap: 2px;
+  padding: 3px 6px;
   background: var(--ui-panel);
   border-bottom: 1px solid var(--ui-border);
   user-select: none;
@@ -102,14 +104,23 @@ body {
   background: none;
   border: none;
   color: var(--ui-fg);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: calc(13px * var(--ui-scale, 1));
+  font-size: calc(12.5px * var(--ui-scale, 1));
+  white-space: nowrap;
 }
 
 .menubar button:hover {
   background: var(--ui-hover);
+}
+
+.menubar .menubar-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 3px 4px;
+  background: var(--ui-border);
+  flex-shrink: 0;
 }
 
 .menubar button.rec-active {
