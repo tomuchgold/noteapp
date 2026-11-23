@@ -1800,7 +1800,6 @@ export default function App() {
       const menu = document.getElementById("tab-context-menu");
       if (menu) menu.style.display = "none";
       setTransformOpen(false);
-      setOverflowOpen(false);
     };
     window.addEventListener("click", hide);
     window.addEventListener("blur", hide);
@@ -1813,30 +1812,8 @@ export default function App() {
   const lang = detectLanguage(activeTab?.path ?? null);
   const lines = activeTab ? activeTab.content.split("\n").length : 0;
 
-  // ---------- v0.22 菜单栏：数据驱动（emoji/文字显示模式 + 溢出折叠「▼」） ----------
+  // ---------- v0.22.1 菜单栏：数据驱动（emoji/文字显示模式），两层自适应换行 ----------
   const menubarRef = useRef<HTMLDivElement>(null);
-  const [overflowed, setOverflowed] = useState(false);
-  const [overflowOpen, setOverflowOpen] = useState(false);
-  useEffect(() => {
-    const el = menubarRef.current;
-    if (!el) return;
-    const calc = () => {
-      // 非「▼」的菜单内容（按钮 + 变换下拉容器），任一右边缘超出可视宽度即收纳
-      const kids = Array.from(
-        el.querySelectorAll<HTMLElement>(":scope > button, :scope > span.menu-drop-wrap")
-      ).filter((b) => b.offsetParent !== null && !b.classList.contains("menubar-more-wrap"));
-      const hid = kids.some((b) => b.offsetLeft + b.offsetWidth > el.clientWidth - 8);
-      setOverflowed(hid);
-    };
-    calc();
-    const ro = new ResizeObserver(calc);
-    ro.observe(el);
-    window.addEventListener("resize", calc);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", calc);
-    };
-  }, []);
 
   /** 菜单项渲染：图标 + 文字（顺序可倒），显示模式由 CSS 类控制 */
   const mbContent = (it: { ico?: string; txt?: string; icoAfter?: boolean }): ReactNode => (
@@ -1928,10 +1905,10 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* 菜单栏（v0.22：数据驱动 + 显示模式 + 溢出折叠「▼」） */}
+      {/* 菜单栏（v0.22.1：数据驱动 + 显示模式，两层自适应换行） */}
       <div
         ref={menubarRef}
-        className={`menubar menu-${editorSettings.menuDisplay}${overflowed ? " has-more" : ""}`}
+        className={`menubar menu-${editorSettings.menuDisplay}`}
       >
         {menuItems.map((it, i) =>
           it.sep ? (
@@ -1964,65 +1941,6 @@ export default function App() {
           )
         )}
         <span className="spacer" />
-        {overflowed && (
-          <span className="menu-drop-wrap menubar-more-wrap">
-            <button
-              className="menubar-more"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOverflowOpen((v) => !v);
-              }}
-              title="更多菜单项（窗口较窄，其余按钮收纳在此）"
-            >
-              ▼
-            </button>
-            {overflowOpen && (
-              <div className="context-menu menubar-overflow" onClick={(e) => e.stopPropagation()}>
-                {menuItems.map((it, j) =>
-                  it.sep ? (
-                    <span key={`os${j}`} className="overflow-sep" />
-                  ) : it.drop ? (
-                    TRANSFORM_ITEMS.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          setOverflowOpen(false);
-                          executeCommand(t.id);
-                        }}
-                        title={BUILTIN_COMMANDS.find((c) => c.id === t.id)?.desc}
-                      >
-                        {t.label}
-                        {shortcutOf(t.id) && <span className="menu-key"> {shortcutOf(t.id)}</span>}
-                      </button>
-                    ))
-                  ) : (
-                    <button
-                      key={j}
-                      onClick={() => {
-                        setOverflowOpen(false);
-                        it.onClick?.();
-                      }}
-                      disabled={it.disabled}
-                      className={it.cls}
-                      title={it.title ?? ""}
-                    >
-                      {mbContent(it)}
-                    </button>
-                  )
-                )}
-                <button
-                  onClick={() => {
-                    setOverflowOpen(false);
-                    setSettingsOpen(true);
-                  }}
-                  title="切换菜单栏显示模式：emoji+文字 / 只 emoji / 只文字"
-                >
-                  🧭 菜单显示模式…
-                </button>
-              </div>
-            )}
-          </span>
-        )}
         {recent.length > 0 && (
           <select
             className="recent-select"

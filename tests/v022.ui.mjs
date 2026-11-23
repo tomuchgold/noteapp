@@ -1,10 +1,10 @@
 /**
- * v0.22.0 验证（菜单栏显示模式 + 溢出折叠「▼」）：
+ * v0.22.1 验证（菜单栏显示模式 + 两层自适应换行，无「▼」收纳）：
  *  1. 默认 emoji+文字：图标与文字都可见
  *  2. 设置切换「只显示 emoji」→ 文字隐藏；「只显示文字」→ 图标隐藏
- *  3. 宽窗口：无 ▼ 按钮
- *  4. 窄窗口（1000px）：按钮被收纳，出现 ▼；点开下拉可执行菜单项（宏管理）
- *  5. 下拉中有「🧭 菜单显示模式…」快捷入口
+ *  3. 宽窗口：菜单栏单行放得下（无 ▼ 按钮）
+ *  4. 窄窗口（1000px）：菜单栏换行为两行，所有按钮仍可见可点（直接点「宏管理」弹窗）
+ *  5. 全程不存在 .menubar-more / .menubar-overflow
  */
 import { chromium } from "/root/.nvm/versions/node/v22.13.1/lib/node_modules/playwright/index.mjs";
 import { createServer } from "vite";
@@ -16,7 +16,7 @@ const check = (name, cond, extra = "") => {
   if (!cond) process.exitCode = 1;
 };
 
-const server = await createServer({ root: "/workspace/notepp", server: { port: 5231 } });
+const server = await createServer({ root: "/workspace/notepp", server: { port: 5232 } });
 await server.listen();
 const browser = await chromium.launch({ executablePath: "/usr/bin/chromium", headless: true });
 const page = await (await browser.newContext({ viewport: { width: 1600, height: 940 } })).newPage();
@@ -53,7 +53,7 @@ await page.addInitScript(() => {
   );
 });
 
-await page.goto("http://localhost:5231/", { waitUntil: "networkidle" });
+await page.goto("http://localhost:5232/", { waitUntil: "networkidle" });
 await page.waitForTimeout(700);
 
 // ---------- 1. 默认 emoji+文字 ----------
@@ -85,37 +85,30 @@ if (await doneBtn.count()) await doneBtn.first().click().catch(() => {});
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 
-// ---------- 3. 超宽窗口：无 ▼ ----------
+// ---------- 3. 宽窗口：单行 + 无 ▼ ----------
 await page.setViewportSize({ width: 2600, height: 900 });
 await page.waitForTimeout(300);
-check("2600px 超宽不溢出（无 ▼）", (await page.locator(".menubar-more").count()) === 0);
-await page.setViewportSize({ width: 1600, height: 900 });
-await page.waitForTimeout(300);
+const mbH_wide = await page.locator(".menubar").evaluate((el) => el.offsetHeight);
+check("2600px 超宽单行（高度 ≤ 40px）", mbH_wide <= 40, `height=${mbH_wide}`);
+check("全程无 ▼ 收纳按钮", (await page.locator(".menubar-more, .menubar-overflow").count()) === 0);
 
-// ---------- 4. 窄窗口：出现 ▼，下拉可执行 ----------
+// ---------- 4. 窄窗口：换行两行，按钮直接可见可点 ----------
 await page.setViewportSize({ width: 1000, height: 900 });
 await page.waitForTimeout(400);
-check("1000px 出现 ▼ 收纳按钮", (await page.locator(".menubar-more").count()) === 1);
-await page.locator(".menubar-more").click();
-await page.waitForTimeout(250);
-const ov = page.locator(".menubar-overflow");
-check("▼ 下拉已展开", (await ov.count()) === 1);
-check("下拉含「宏管理」", (await ov.locator("button", { hasText: "宏管理" }).count()) === 1);
-check("下拉含「🧭 菜单显示模式…」", (await ov.locator("button", { hasText: "菜单显示模式" }).count()) === 1);
-await ov.locator("button", { hasText: "宏管理" }).click();
+const mbH_narrow = await page.locator(".menubar").evaluate((el) => el.offsetHeight);
+check("1000px 换行为两行（高度 > 40px）", mbH_narrow > 40, `height=${mbH_narrow}`);
+const macroBtn = page.locator(".menubar button", { hasText: "宏管理" }).first();
+const macroVisible = await macroBtn.evaluate((el) => {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+});
+check("「宏管理」按钮直接可见（不被遮挡）", macroVisible);
+await macroBtn.click();
 await page.waitForTimeout(300);
-check("下拉点击宏管理 → 弹出宏管理对话框", (await page.locator(".modal.macro, .macro-dialog, [class*=macro]").count()) >= 1);
+check("直接点击宏管理 → 弹出宏管理对话框", (await page.locator(".modal.macro, .macro-dialog, [class*=macro]").count()) >= 1);
 await page.locator(".modal-mask button", { hasText: "完成" }).first().click();
 await page.waitForTimeout(200);
-// 点空白处关闭下拉（若仍开着）
-await page.mouse.click(500, 400);
-await page.waitForTimeout(200);
-
-// ---------- 5. 变换菜单在收纳下拉中扁平展开 ----------
-await page.locator(".menubar-more").click();
-await page.waitForTimeout(250);
-check("下拉含变换项（转为大写）", (await page.locator(".menubar-overflow button", { hasText: "转为大写" }).count()) === 1);
-await page.keyboard.press("Escape");
+check("收纳按钮/下拉仍未出现", (await page.locator(".menubar-more, .menubar-overflow").count()) === 0);
 
 console.log(`\n===== v022: ${results.filter((r) => r.ok).length}/${results.length} PASS =====`);
 await browser.close();

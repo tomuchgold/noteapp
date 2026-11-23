@@ -164,18 +164,22 @@ check(
   JSON.stringify(urls2)
 );
 
-// ---------- 6. 菜单栏紧凑化：flex-wrap + 窄窗口自动换行 ----------
-const ow = await page.locator(".menubar").evaluate((el) => getComputedStyle(el).overflow);
-check("菜单栏单行收纳（overflow hidden）", ow === "hidden", ow);
-check("1440px 溢出按钮收纳进 ▼", (await page.locator(".menubar-more").count()) === 1);
+// ---------- 6. 菜单栏紧凑化：flex-wrap 两层换行（v0.22.1 回归） ----------
+const wrapMode = await page.locator(".menubar").evaluate((el) => getComputedStyle(el).flexWrap);
+check("菜单栏 flex-wrap 换行", wrapMode === "wrap", wrapMode);
+check("无 ▼ 收纳按钮", (await page.locator(".menubar-more").count()) === 0);
 await page.setViewportSize({ width: 900, height: 900 });
 await page.waitForTimeout(300);
-check("900px 溢出按钮收纳进 ▼", (await page.locator(".menubar-more").count()) === 1);
-await page.locator(".menubar-more").click();
-await page.waitForTimeout(250);
-check("900px ▼ 下拉含被收纳的「设置」", (await page.locator(".menubar-overflow button", { hasText: "设置" }).count()) === 1);
-await page.keyboard.press("Escape");
-await page.waitForTimeout(150);
+const h900 = await page.locator(".menubar").evaluate((el) => el.offsetHeight);
+check("900px 自动换行为两行", h900 > 40, `height=${h900}`);
+const setBtn900 = page.locator(".menubar button", { hasText: "设置" }).first();
+const setVis900 = await setBtn900.evaluate((el) => {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+});
+check("900px「设置」按钮直接可见", setVis900);
+await page.setViewportSize({ width: 1600, height: 940 });
+await page.waitForTimeout(300);
 
 console.log(`\n===== v021: ${results.filter((r) => r.ok).length}/${results.length} PASS =====`);
 await browser.close();

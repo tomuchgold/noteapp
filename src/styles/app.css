@@ -87,22 +87,16 @@ body {
   flex: 1;
 }
 
-/* 菜单栏（v0.22：单行收纳，溢出按钮折叠进「▼」；显示模式 emoji/文字可切） */
+/* 菜单栏（v0.22.1：两层自适应换行；显示模式 emoji/文字可切） */
 .menubar {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   padding: 3px 6px;
   background: var(--ui-panel);
   border-bottom: 1px solid var(--ui-border);
   user-select: none;
-  overflow: hidden;
-  position: relative;
-  min-height: 30px;
-}
-.menubar.has-more {
-  padding-right: 34px;
 }
 .menubar .m-ico {
   margin-right: 3px;
@@ -112,35 +106,6 @@ body {
 }
 .menubar.menu-text .m-ico {
   display: none;
-}
-.menubar .menubar-more {
-  padding: 3px 9px;
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-.menubar .menubar-more-wrap {
-  position: absolute;
-  right: 4px;
-  top: 2px;
-  bottom: 2px;
-  align-items: center;
-}
-.menubar .menubar-more-wrap .menubar-overflow {
-  display: block;
-  position: absolute;
-  top: 100%;
-  right: 0;
-  left: auto;
-  z-index: 80;
-  max-height: 70vh;
-  overflow-y: auto;
-  min-width: 180px;
-}
-.menubar .overflow-sep {
-  display: block;
-  height: 1px;
-  margin: 3px 6px;
-  background: var(--ui-border);
 }
 
 .menubar button {
@@ -1838,9 +1803,6 @@ button.link {
     flex-wrap: nowrap;
     padding: 2px 4px;
     scrollbar-width: none;
-  }
-  .menubar .menubar-more-wrap {
-    display: none;
   }
   .menubar::-webkit-scrollbar {
     display: none;
