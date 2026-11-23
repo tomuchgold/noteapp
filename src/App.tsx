@@ -16,6 +16,8 @@ import PreviewDialog from "./components/PreviewDialog";
 import FindBar from "./components/FindBar";
 import SearchResults from "./components/SearchResults";
 import AnnoPanel from "./components/AnnoPanel";
+import OutlinePanel, { type OutlineHeading } from "./components/OutlinePanel";
+import { countWords } from "./components/StatusBar";
 import MacroDialog from "./components/MacroDialog";
 import SnippetDialog from "./components/SnippetDialog";
 import KeymapDialog from "./components/KeymapDialog";
@@ -712,6 +714,45 @@ export default function App() {
     setGotoRequest({ n: gotoSeq.current, from: ann.from, to: ann.to });
   }, []);
 
+  // ---------- v0.23 大纲/目录面板（Markdown 标题，不限扩展名） ----------
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const outline = useMemo<OutlineHeading[]>(() => {
+    if (!activeTab) return [];
+    const out: OutlineHeading[] = [];
+    let inCode = false;
+    const lines = activeTab.content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (/^\s*(```|~~~)/.test(l)) inCode = !inCode; // 跳过代码块
+      if (inCode) continue;
+      const m = /^(#{1,6})\s+(.*?)\s*#*\s*$/.exec(l);
+      if (m) out.push({ level: m[1].length, text: m[2].replace(/[*_`]/g, ""), line: i + 1 });
+    }
+    return out;
+  }, [activeTab?.id, activeTab?.content]);
+  const jumpToOutline = useCallback((line: number) => {
+    setActionSignal({ type: "goto-line", n: ++actionCount.current, text: String(line) });
+  }, []);
+
+  // ---------- v0.23 光标位置记忆（下次打开同一文件回到上次行号） ----------
+  const cursorPosKey = "notepp.cursor-pos";
+  const saveCursorPos = useCallback((path: string, line: number, col: number) => {
+    try {
+      const all = JSON.parse(localStorage.getItem(cursorPosKey) ?? "{}");
+      const cur = all[path];
+      if (cur && cur.line === line && cur.col === col) return;
+      all[path] = { line, col };
+      localStorage.setItem(cursorPosKey, JSON.stringify(all));
+    } catch { /* ignore */ }
+  }, []);
+  const loadCursorPos = useCallback((path: string): { line: number; col: number } | null => {
+    try {
+      const all = JSON.parse(localStorage.getItem(cursorPosKey) ?? "{}");
+      const c = all[path];
+      return c && Number.isFinite(c.line) && c.line >= 1 ? c : null;
+    } catch { return null; }
+  }, []);
+
   // ---------- 插入表格 / Markdown 预览 ----------
   const [tableOpen, setTableOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -940,10 +981,13 @@ export default function App() {
       };
       setTabs((ts) => [...ts, tab]);
       setActiveId(tab.id);
+      // 恢复上次光标位置：光标落在上次所在行
+      const saved = loadCursorPos(path);
+      if (saved) setTimeout(() => jumpToOutline(saved.line), 80);
     } catch (e) {
       alert(`打开文件失败：${e}`);
     }
-  }, [tabs]);
+  }, [tabs, loadCursorPos, jumpToOutline]);
 
   // openPath 就绪后写入 ref，供文件夹搜索结果跳转使用
   useEffect(() => {
@@ -1255,6 +1299,11 @@ export default function App() {
       const active =
         loaded.find((t) => t.path === session?.activePath) ?? loaded[0];
       setActiveId(active.id);
+      // 恢复上次光标位置（会话恢复路径）
+      if (active.path) {
+        const saved = loadCursorPos(active.path);
+        if (saved) setTimeout(() => jumpToOutline(saved.line), 100);
+      }
     })();
   }, [newTab]);
 
@@ -1815,6 +1864,7 @@ export default function App() {
 
   const lang = detectLanguage(activeTab?.path ?? null);
   const lines = activeTab ? activeTab.content.split("\n").length : 0;
+  const wordCount = useMemo(() => (activeTab ? countWords(activeTab.content) : 0), [activeTab?.id, activeTab?.content]);
 
   // ---------- v0.22.1 菜单栏：数据驱动（emoji/文字显示模式），两层自适应换行 ----------
   const menubarRef = useRef<HTMLDivElement>(null);
@@ -1898,6 +1948,7 @@ export default function App() {
     { ico: "👁️", txt: "预览", title: "Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览", disabled: !activeTab, on: previewOpen, onClick: () => setPreviewOpen(true) },
     { ico: "🖨️", txt: "打印", title: "打印 / 导出 PDF（按当前缩放字号；打印对话框里选「另存为 PDF」）", disabled: !activeTab, cls: "menubar-secondary", onClick: doPrint },
     { ico: "🖍️", txt: "标注", title: "标注导航：当前文件所有划线/高亮/备注列表，点击跳转", disabled: !activeTab, on: annoOpen, onClick: () => setAnnoOpen((v) => !v) },
+    { ico: "📑", txt: "目录", title: "大纲目录：解析当前文件 Markdown 标题（#/##/###，不限扩展名），点击跳转", disabled: !activeTab, on: outlineOpen, onClick: () => setOutlineOpen((v) => !v) },
     { ico: "↔️", txt: "分屏", title: "分屏对照：左右同时查看两个文件（再次点击关闭）", on: !!splitId, onClick: toggleSplit },
     { sep: true },
     { ico: "⚙️", txt: "设置", title: "编辑器样式设置：字号/主题/行高/高亮颜色等", onClick: () => setSettingsOpen(true) },
@@ -2102,6 +2153,7 @@ export default function App() {
               onCursor={(line, col, selected, selText) => {
                 setCursor({ line, col, selected });
                 selectionTextRef.current = selText ?? "";
+                if (activeTab.path) saveCursorPos(activeTab.path, line, col);
               }}
               actionSignal={actionSignal}
               settings={editorSettings}
@@ -2179,6 +2231,15 @@ export default function App() {
       )}
 
       {activeTab && (
+        <OutlinePanel
+          open={outlineOpen}
+          headings={outline}
+          onJump={jumpToOutline}
+          onClose={() => setOutlineOpen(false)}
+        />
+      )}
+
+      {activeTab && (
         <FindBar
           open={findOpen}
           total={findMatches.length}
@@ -2226,6 +2287,8 @@ export default function App() {
           col={cursor.col}
           selected={cursor.selected}
           lines={lines}
+          chars={activeTab.content.length}
+          words={wordCount}
           encoding={activeTab.encoding}
           bom={activeTab.bom}
           eol={activeTab.eol}
