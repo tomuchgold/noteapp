@@ -168,6 +168,70 @@ const lineB = await page3.locator(".statusbar .status-item", { hasText: "行 " }
 check("再切回 b.md → 恢复到行 5", /行 5\b/.test(lineB ?? ""), lineB ?? "");
 await page3.close();
 
+// ---------- 2.7 未保存草稿也记住光标（新建文件无路径场景） ----------
+const page4 = await (await browser.newContext({ viewport: { width: 1600, height: 940 } })).newPage();
+await page4.addInitScript(() => {
+  window.__FS__ = {};
+  window.__TAURI_INTERNALS__ = {
+    transformCallback: (cb) => cb,
+    invoke: (cmd) => (cmd === "opened_urls" ? Promise.resolve([]) : Promise.resolve(null)),
+    metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main", windowLabel: "main" } },
+    unregisterListener: () => {},
+    registerListener: () => {},
+  };
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+  window.matchMedia =
+    window.matchMedia ||
+    (() => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }));
+  // 两个未保存草稿（path=null），各带光标记录：草稿A 行 3，草稿B 行 5
+  // 注意：addInitScript 在 reload 时会重跑，用标记防止把已持久化的 session 覆盖回去
+  if (!localStorage.getItem("notepp.seeded-v237")) {
+    const lines = (n) => Array.from({ length: n }, (_, i) => `line${i + 1}`).join("\n");
+    localStorage.setItem("notepp.seeded-v237", "1");
+    localStorage.setItem(
+      "notepp.session",
+      JSON.stringify({
+        paths: [],
+        activePath: null,
+        drafts: [
+          { path: null, name: "草稿A.md", content: lines(8), cursor: { line: 3, col: 1 } },
+          { path: null, name: "草稿B.md", content: lines(9), cursor: { line: 5, col: 1 } },
+        ],
+      })
+    );
+  }
+});
+await page4.goto("http://localhost:5234/", { waitUntil: "networkidle" });
+await page4.waitForTimeout(1200);
+// 初始激活第一个草稿 → 应恢复到行 3
+const d0 = await page4.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
+check("重启后草稿A → 恢复到行 3", /行 3\b/.test(d0 ?? ""), d0 ?? "");
+// 切到草稿B → 恢复到行 5
+await page4.locator(".tabbar .tab", { hasText: "草稿B" }).click();
+await page4.waitForTimeout(500);
+const d5 = await page4.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
+check("切到草稿B → 恢复到行 5", /行 5\b/.test(d5 ?? ""), d5 ?? "");
+// 在草稿B 把光标移到第 8 行 → 切走再切回，应停在第 8 行（会话内实时记录）
+await page4.locator(".cm-content").click();
+await page4.keyboard.press("Control+Home");
+for (let i = 0; i < 7; i++) await page4.keyboard.press("ArrowDown");
+await page4.waitForTimeout(300);
+await page4.locator(".tabbar .tab", { hasText: "草稿A" }).click();
+await page4.waitForTimeout(400);
+await page4.locator(".tabbar .tab", { hasText: "草稿B" }).click();
+await page4.waitForTimeout(500);
+const d8 = await page4.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
+check("草稿B 移动后切回 → 停在新位置行 8", /行 8\b/.test(d8 ?? ""), d8 ?? "");
+// 重启验证：草稿B 的光标已随会话持久化到行 8
+await page4.reload({ waitUntil: "networkidle" });
+await page4.waitForTimeout(1200);
+// 激活的是草稿A；切到草稿B 应恢复到行 8
+await page4.locator(".tabbar .tab", { hasText: "草稿B" }).click();
+await page4.waitForTimeout(600);
+const d8r = await page4.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
+check("重启后草稿B → 恢复到持久化的行 8", /行 8\b/.test(d8r ?? ""), d8r ?? "");
+await page4.close();
+
 // ---------- 3. 状态栏字数统计 ----------
 const stats = await page.locator(".statusbar .status-item", { hasText: "字 · " }).first().textContent().catch(() => "");
 const docChars = DOC.length;

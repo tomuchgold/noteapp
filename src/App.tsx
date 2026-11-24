@@ -736,6 +736,8 @@ export default function App() {
 
   // ---------- v0.23 光标位置记忆（下次打开同一文件回到上次行号） ----------
   const cursorPosKey = "notepp.cursor-pos";
+  // 未保存草稿（无路径标签）的光标：会话内按标签 id 记内存，重启时随草稿持久化
+  const draftCursorRef = useRef<Map<string, { line: number; col: number }>>(new Map());
   const saveCursorPos = useCallback((path: string, line: number, col: number) => {
     try {
       const all = JSON.parse(localStorage.getItem(cursorPosKey) ?? "{}");
@@ -752,11 +754,12 @@ export default function App() {
       return c && Number.isFinite(c.line) && c.line >= 1 ? c : null;
     } catch { return null; }
   }, []);
-  // 切换标签时恢复该文件的光标位置（多文件固有行为：每个标签停在各自上次的位置）
+  // 切换标签时恢复该文件的光标位置（多文件固有行为：每个标签停在各自上次的位置；
+  // 未保存草稿同样适用——按标签 id 从内存恢复）
   useEffect(() => {
     const t = tabs.find((x) => x.id === activeId);
-    if (!t?.path) return;
-    const saved = loadCursorPos(t.path);
+    if (!t) return;
+    const saved = t.path ? loadCursorPos(t.path) : draftCursorRef.current.get(t.id) ?? null;
     if (saved) jumpToOutline(saved.line);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -1246,14 +1249,14 @@ export default function App() {
     if (sessionLoaded.current) return;
     sessionLoaded.current = true;
     (async () => {
-      let session: { paths: string[]; activePath: string | null; drafts?: { path: string | null; name: string; content: string }[] } | null = null;
+      let session: { paths: string[]; activePath: string | null; drafts?: { path: string | null; name: string; content: string; cursor?: { line: number; col: number } }[] } | null = null;
       try {
         session = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
       } catch {
         session = null;
       }
       const paths = session?.paths ?? [];
-      const drafts: { path: string | null; name: string; content: string }[] = Array.isArray(session?.drafts)
+      const drafts: { path: string | null; name: string; content: string; cursor?: { line: number; col: number } }[] = Array.isArray(session?.drafts)
         ? session.drafts
         : [];
       const loaded: FileTab[] = [];
@@ -1284,7 +1287,7 @@ export default function App() {
             t.dirty = true;
           }
         } else {
-          loaded.push({
+          const tab: FileTab = {
             id: newId(),
             path: null,
             name: d.name || "未命名",
@@ -1293,7 +1296,12 @@ export default function App() {
             encoding: "UTF-8",
             bom: false,
             eol: "LF",
-          });
+          };
+          // 草稿自带光标 → 种回内存 Map，激活该标签时自动恢复
+          if (d.cursor && Number.isFinite(d.cursor.line) && d.cursor.line >= 1) {
+            draftCursorRef.current.set(tab.id, { line: d.cursor.line, col: d.cursor.col ?? 1 });
+          }
+          loaded.push(tab);
         }
       }
       if (loaded.length === 0) {
@@ -1316,7 +1324,10 @@ export default function App() {
     const DRAFT_MAX = 500_000;
     let drafts = tabs
       .filter((t) => !t.readOnly && (!t.path || t.dirty) && t.content.length > 0 && t.content.length <= DRAFT_MAX)
-      .map((t) => ({ path: t.path ?? null, name: t.name, content: t.content }));
+      .map((t) => {
+        const cur = t.path ? loadCursorPos(t.path) : draftCursorRef.current.get(t.id) ?? undefined;
+        return { path: t.path ?? null, name: t.name, content: t.content, cursor: cur };
+      });
     const payload = JSON.stringify({ paths, activePath, drafts });
     if (payload.length > 4_000_000) drafts = []; // 超限只保路径，保证设置不爆 localStorage
     localStorage.setItem(SESSION_KEY, JSON.stringify({ paths, activePath, drafts }));
@@ -2154,6 +2165,7 @@ export default function App() {
                 setCursor({ line, col, selected });
                 selectionTextRef.current = selText ?? "";
                 if (activeTab.path) saveCursorPos(activeTab.path, line, col);
+                else draftCursorRef.current.set(activeTab.id, { line, col });
               }}
               actionSignal={actionSignal}
               settings={editorSettings}
