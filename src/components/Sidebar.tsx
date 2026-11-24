@@ -11,6 +11,10 @@ interface Props {
   onDelete: (id: string) => void;
   /** 侧栏底部附加区（文件夹树等） */
   children?: ReactNode;
+  /** 文件库分类区高度（px），0=自适应 */
+  libH?: number;
+  /** 拖拽上下分割条调整分类区高度 */
+  onLibResize?: (h: number) => void;
 }
 
 const FIXED = [
@@ -29,6 +33,8 @@ export default function Sidebar({
   onRename,
   onDelete,
   children,
+  libH = 0,
+  onLibResize,
 }: Props) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -37,6 +43,26 @@ export default function Sidebar({
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const newRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
+  const dragState = useRef<{ startY: number; startH: number } | null>(null);
+
+  // 上下分割条拖拽：调整文件库分类区高度
+  const startLibDrag = (e: React.MouseEvent) => {
+    if (!onLibResize) return;
+    e.preventDefault();
+    dragState.current = { startY: e.clientY, startH: document.querySelector<HTMLElement>(".sidebar-lib")?.offsetHeight ?? 0 };
+    const move = (ev: MouseEvent) => {
+      if (!dragState.current) return;
+      const next = dragState.current.startH + (ev.clientY - dragState.current.startY);
+      onLibResize(Math.round(next));
+    };
+    const up = () => {
+      dragState.current = null;
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
 
   useEffect(() => {
     if (creating) newRef.current?.focus();
@@ -71,6 +97,7 @@ export default function Sidebar({
 
   return (
     <aside className="sidebar">
+      <div className="sidebar-lib" style={libH > 0 ? { height: libH, flex: `0 0 ${libH}px` } : undefined}>
       <div className="sidebar-head">
         <span className="sidebar-title">文件库</span>
         <button
@@ -190,6 +217,15 @@ export default function Sidebar({
           <p className="side-hint">点击右上角 ＋ 新建分类，把文件归类管理</p>
         )}
       </div>
+      </div>
+      {children !== undefined && (
+        <div
+          className={`vsplitter ${libH > 0 ? "fixed" : ""}`}
+          title="上下拖拽调整文件库与文件夹树的高度"
+          onMouseDown={startLibDrag}
+          onDoubleClick={() => onLibResize?.(0)}
+        />
+      )}
       {children}
     </aside>
   );

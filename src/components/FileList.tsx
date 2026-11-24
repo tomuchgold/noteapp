@@ -17,6 +17,8 @@ interface Props {
   onOpenFolderOf: (path: string) => void;
   /** 在系统文件管理器中定位该文件 */
   onReveal: (path: string) => void;
+  /** 关闭文件列表（v0.26） */
+  onClose?: () => void;
 }
 
 export default function FileList({
@@ -33,6 +35,7 @@ export default function FileList({
   onNewFile,
   onOpenFolderOf,
   onReveal,
+  onClose,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
 
@@ -57,6 +60,11 @@ export default function FileList({
         <button className="icon-btn" title="新建文件 (Ctrl+N)" onClick={onNewFile}>
           ＋
         </button>
+        {onClose && (
+          <button className="icon-btn" title="关闭文件列表" onClick={onClose}>
+            ×
+          </button>
+        )}
       </div>
 
       <div className="filelist-search">

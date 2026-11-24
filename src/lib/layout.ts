@@ -5,6 +5,8 @@ export interface LayoutState {
   filelistOpen: boolean;
   sidebarWidth: number;
   filelistWidth: number;
+  /** 侧栏内「文件库分类区」高度（px），上下拖拽分割条调整；0=自适应 */
+  sidebarLibH: number;
 }
 
 export const DEFAULT_LAYOUT: LayoutState = {
@@ -12,6 +14,7 @@ export const DEFAULT_LAYOUT: LayoutState = {
   filelistOpen: true,
   sidebarWidth: 190,
   filelistWidth: 264,
+  sidebarLibH: 0,
 };
 
 const KEY = "notepp.layout";
@@ -19,6 +22,8 @@ const SIDEBAR_MIN = 140,
   SIDEBAR_MAX = 400;
 const FILELIST_MIN = 180,
   FILELIST_MAX = 520;
+const LIBH_MIN = 100,
+  LIBH_MAX = 800;
 
 function clamp(v: number, min: number, max: number, def: number) {
   if (!Number.isFinite(v)) return def;
@@ -35,6 +40,7 @@ export function loadLayout(): LayoutState {
       filelistOpen: p.filelistOpen ?? DEFAULT_LAYOUT.filelistOpen,
       sidebarWidth: clamp(p.sidebarWidth ?? 0, SIDEBAR_MIN, SIDEBAR_MAX, DEFAULT_LAYOUT.sidebarWidth),
       filelistWidth: clamp(p.filelistWidth ?? 0, FILELIST_MIN, FILELIST_MAX, DEFAULT_LAYOUT.filelistWidth),
+      sidebarLibH: clamp(p.sidebarLibH ?? 0, 0, LIBH_MAX, DEFAULT_LAYOUT.sidebarLibH),
     };
   } catch {
     return { ...DEFAULT_LAYOUT };
@@ -55,4 +61,9 @@ export function clampSidebarWidth(v: number) {
 
 export function clampFilelistWidth(v: number) {
   return clamp(v, FILELIST_MIN, FILELIST_MAX, DEFAULT_LAYOUT.filelistWidth);
+}
+
+export function clampSidebarLibH(v: number) {
+  if (v === 0) return 0; // 0 = 自适应（双击复位）
+  return clamp(v, LIBH_MIN, LIBH_MAX, DEFAULT_LAYOUT.sidebarLibH);
 }

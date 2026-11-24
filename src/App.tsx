@@ -91,6 +91,7 @@ import {
 } from "./lib/files";
 import {
   clampFilelistWidth,
+  clampSidebarLibH,
   clampSidebarWidth,
   DEFAULT_LAYOUT,
   loadLayout,
@@ -2087,6 +2088,8 @@ export default function App() {
             onCreate={createCategory}
             onRename={renameCategory}
             onDelete={deleteCategory}
+            libH={layout.sidebarLibH}
+            onLibResize={(h) => patchLayout({ sidebarLibH: clampSidebarLibH(h) })}
           >
             <FolderTree
               root={folderRoot}
@@ -2135,6 +2138,7 @@ export default function App() {
             onNewFile={newTab}
             onOpenFolderOf={openFolderOf}
             onReveal={revealTreePath}
+            onClose={() => patchLayout({ filelistOpen: false })}
           />
         )}
         {layout.filelistOpen && (
@@ -2509,6 +2513,25 @@ export default function App() {
               <p className="hint">
                 生图模型：<b>{resolveConfig(aiConfig).imgModel || "未配置"}</b>（在「AI 设置」中修改）；Ctrl+Enter 直接生成
               </p>
+              <div className="img-prefs">
+                <span className="img-prefs-label">生图偏好（点击追加到提示词）：</span>
+                {[
+                  ["纯物品，透明背景，无环境", "🧊 透明物品"],
+                  ["纯物品，白底产品图，无阴影", "🧻 白底产品"],
+                  ["极简风格，居中构图", "🎯 极简居中"],
+                  ["高清细节，4k", "🔍 高清细节"],
+                ].map(([add, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className="img-pref-chip"
+                    title={`追加「${add}」`}
+                    onClick={() => setImgPromptText((t) => (t ? `${t.replace(/[，,]\s*$/, "")}，${add}` : add))}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               {imgErr && <p className="msg err" style={{ whiteSpace: "pre-wrap" }}>{imgErr}</p>}
             </div>
             <div className="modal-foot">

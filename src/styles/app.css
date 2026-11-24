@@ -3018,3 +3018,60 @@ kbd {
 .model-chip .model-img.on {
   color: #22c55e;
 }
+
+/* ---------- v0.26 侧栏：文件库/文件夹树上下分割 + 文件列表关闭 ---------- */
+.sidebar-lib {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.sidebar-lib.fixed {
+  flex: 0 0 auto;
+  overflow-y: auto;
+}
+.sidebar-lib.fixed .sidebar-section.grow {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.vsplitter {
+  flex: 0 0 5px;
+  height: 5px;
+  cursor: row-resize;
+  background: transparent;
+  border-top: 1px solid var(--ui-border);
+  transition: background 0.15s;
+}
+.vsplitter:hover {
+  background: color-mix(in srgb, var(--accent, #4f8cff) 45%, transparent);
+}
+.filelist-close {
+  margin-left: auto;
+}
+
+/* v0.26 生图偏好 chips */
+.img-prefs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+.img-prefs-label {
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: var(--ui-dim, #999);
+}
+.img-pref-chip {
+  background: var(--ui-panel, #1e1e1e);
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  color: var(--ui-fg);
+  padding: 2px 9px;
+  font-size: calc(11px * var(--ui-scale, 1));
+  cursor: pointer;
+}
+.img-pref-chip:hover {
+  border-color: var(--accent, #4f8cff);
+  background: var(--ui-hover, #2a2a2a);
+}
