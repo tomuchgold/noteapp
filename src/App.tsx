@@ -752,6 +752,14 @@ export default function App() {
       return c && Number.isFinite(c.line) && c.line >= 1 ? c : null;
     } catch { return null; }
   }, []);
+  // 切换标签时恢复该文件的光标位置（多文件固有行为：每个标签停在各自上次的位置）
+  useEffect(() => {
+    const t = tabs.find((x) => x.id === activeId);
+    if (!t?.path) return;
+    const saved = loadCursorPos(t.path);
+    if (saved) jumpToOutline(saved.line);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
   // ---------- 插入表格 / Markdown 预览 ----------
   const [tableOpen, setTableOpen] = useState(false);
@@ -981,13 +989,10 @@ export default function App() {
       };
       setTabs((ts) => [...ts, tab]);
       setActiveId(tab.id);
-      // 恢复上次光标位置：光标落在上次所在行
-      const saved = loadCursorPos(path);
-      if (saved) setTimeout(() => jumpToOutline(saved.line), 80);
     } catch (e) {
       alert(`打开文件失败：${e}`);
     }
-  }, [tabs, loadCursorPos, jumpToOutline]);
+  }, [tabs]);
 
   // openPath 就绪后写入 ref，供文件夹搜索结果跳转使用
   useEffect(() => {
@@ -1299,11 +1304,6 @@ export default function App() {
       const active =
         loaded.find((t) => t.path === session?.activePath) ?? loaded[0];
       setActiveId(active.id);
-      // 恢复上次光标位置（会话恢复路径）
-      if (active.path) {
-        const saved = loadCursorPos(active.path);
-        if (saved) setTimeout(() => jumpToOutline(saved.line), 100);
-      }
     })();
   }, [newTab]);
 

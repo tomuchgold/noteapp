@@ -466,8 +466,13 @@ export default function Editor({
       }),
     });
     viewRef.current = view;
-    // 挂载即聚焦：新建标签 / 切换标签后光标直接落在编辑区
-    requestAnimationFrame(() => view.focus());
+    // 挂载即聚焦 + 上报一次初始光标（避免切换标签时状态栏残留上一个文件的行列）
+    requestAnimationFrame(() => {
+      view.focus();
+      const sel = view.state.selection.main;
+      const line = view.state.doc.lineAt(sel.head);
+      onCursorRef.current(line.number, sel.head - line.from + 1, sel.to - sel.from);
+    });
     // Ctrl/⌘ + 滚轮 缩放字体
     const onWheel = (e: WheelEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
@@ -664,8 +669,12 @@ export default function Editor({
   }, [columnMode]);
 
   // 外部动作（Ctrl+F、宏回放、AI 写回、插入表格/文本）
+  // lastSignalN 防止 Editor 重建（切换标签）时重放上一个实例已处理过的旧信号
+  const lastSignalN = useRef(actionSignal?.n ?? -1);
   useEffect(() => {
     if (!actionSignal) return;
+    if (actionSignal.n === lastSignalN.current) return;
+    lastSignalN.current = actionSignal.n;
     const view = viewRef.current;
     if (!view) return;
     view.focus();

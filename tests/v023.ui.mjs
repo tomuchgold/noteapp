@@ -127,6 +127,47 @@ await page.waitForTimeout(1200);
 const line2 = await page.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
 check("重启后光标回到上次所在行（行 3）", line2?.includes("行 3,") || /行 3\b/.test(line2 ?? ""), line2 ?? "");
 
+// ---------- 2.5 切换标签各自记忆光标（多文件固有行为） ----------
+// 新开一个干净上下文：预置两个文件与光标记录，模拟真实多文件切换
+const page3 = await (await browser.newContext({ viewport: { width: 1600, height: 940 } })).newPage();
+await page3.addInitScript(() => {
+  window.__FS__ = {
+    "/demo/book.md": { content: ["# A", "", "x", "", "## B", "", "```py", "# t", "p(1)", "```", "", "## C", "", "### D", "", "end"].join("\n"), mtime: 1 },
+    "/demo/b.md": { content: "l1\nl2\nl3\nl4\nl5\nl6\n", mtime: 3 },
+  };
+  window.__TAURI_INTERNALS__ = {
+    transformCallback: (cb) => cb,
+    invoke: (cmd, args) => {
+      if (cmd === "opened_urls") return Promise.resolve([]);
+      if (cmd === "read_text_file") { const f = window.__FS__[args.path]; return f ? Promise.resolve({ content: f.content, encoding: "UTF-8", bom: false, eol: "LF", size: f.content.length }) : Promise.reject("nf"); }
+      if (cmd === "file_info") { const f = window.__FS__[args.path]; return f ? Promise.resolve({ size: f.content.length, mtime: f.mtime }) : Promise.reject("nf"); }
+      return Promise.resolve(null);
+    },
+    metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main", windowLabel: "main" } },
+    unregisterListener: () => {},
+    registerListener: () => {},
+  };
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+  window.matchMedia =
+    window.matchMedia ||
+    (() => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }));
+  localStorage.setItem("notepp.cursor-pos", JSON.stringify({ "/demo/book.md": { line: 3, col: 1 }, "/demo/b.md": { line: 5, col: 1 } }));
+  localStorage.setItem("notepp.session", JSON.stringify({ paths: ["/demo/book.md", "/demo/b.md"], activePath: "/demo/b.md", drafts: [] }));
+});
+await page3.goto("http://localhost:5234/", { waitUntil: "networkidle" });
+await page3.waitForTimeout(1200);
+const t0 = await page3.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
+check("初始 b.md → 恢复到行 5", /行 5\b/.test(t0 ?? ""), t0 ?? "");
+await page3.locator(".tabbar .tab", { hasText: "book.md" }).click();
+await page3.waitForTimeout(500);
+const lineBook = await page3.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
+check("切回 book.md → 恢复到行 3", /行 3\b/.test(lineBook ?? ""), lineBook ?? "");
+await page3.locator(".tabbar .tab", { hasText: "b.md" }).click();
+await page3.waitForTimeout(500);
+const lineB = await page3.locator(".statusbar .status-item", { hasText: "行 " }).first().textContent();
+check("再切回 b.md → 恢复到行 5", /行 5\b/.test(lineB ?? ""), lineB ?? "");
+await page3.close();
+
 // ---------- 3. 状态栏字数统计 ----------
 const stats = await page.locator(".statusbar .status-item", { hasText: "字 · " }).first().textContent().catch(() => "");
 const docChars = DOC.length;
