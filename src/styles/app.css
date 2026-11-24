@@ -293,6 +293,28 @@ body {
   color: var(--ui-fg);
 }
 
+/* v0.27：状态栏 AI 任务 pill（生图/AI 运行中、结果就绪、出错） */
+.status-item.ai-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-accent, #4f9cf9);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-item.ai-pill.error {
+  color: #e56d6d;
+}
+.status-item.ai-pill.done {
+  color: #57c78a;
+}
+.status-item.ai-pill .spinner {
+  width: 10px;
+  height: 10px;
+}
+
 /* 弹窗 */
 .modal-mask {
   position: fixed;
@@ -302,6 +324,44 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 200;
+}
+
+/* v0.27：AI 结果浮窗（非阻塞）——遮罩透明且不拦截点击，
+   编辑可继续；面板停靠右下角，自带边框阴影 */
+.modal-mask.ai-float {
+  pointer-events: none;
+  background: transparent;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 14px 18px;
+  z-index: 190;
+}
+.modal-mask.ai-float .modal {
+  pointer-events: auto;
+  width: min(440px, 44vw);
+  max-height: min(60vh, 480px);
+  display: flex;
+  flex-direction: column;
+}
+.modal-mask.ai-float .modal-body {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+}
+.modal-mask.ai-float .modal-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.modal-mask.ai-float .modal-head h2 {
+  font-size: 14px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal-mask.ai-float .ai-output {
+  min-height: 90px;
 }
 
 .modal {

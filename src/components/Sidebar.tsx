@@ -176,7 +176,13 @@ export default function Sidebar({
                 setEditingId(c.id);
                 setEditName(c.name);
               }}
-              title="双击重命名"
+              onContextMenu={(e) => {
+                // v0.27：右键分类 → 就地重命名（与双击等效）
+                e.preventDefault();
+                setEditingId(c.id);
+                setEditName(c.name);
+              }}
+              title="右键或双击重命名"
             >
               <span className="cat-dot" style={{ background: c.color }} />
               <span className="side-label-text">{c.name}</span>

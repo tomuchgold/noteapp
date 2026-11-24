@@ -14,6 +14,9 @@ interface Props {
   words?: number;
   /** 缩放百分比（点击复位 100%） */
   zoom?: number;
+  /** AI 任务状态（v0.27：运行中/结果就绪/出错，点击回到 AI 面板） */
+  aiStatus?: { state: "running" | "done" | "error"; label: string } | null;
+  onAiStatusClick?: () => void;
 }
 
 /** 估算字数：CJK 字符逐字计数，其余按空白分词 */
@@ -23,7 +26,7 @@ export function countWords(text: string): number {
   return cjk + words;
 }
 
-export default function StatusBar({ line, col, selected, lines, encoding, bom, eol, language, path, chars, words, zoom }: Props) {
+export default function StatusBar({ line, col, selected, lines, encoding, bom, eol, language, path, chars, words, zoom, aiStatus, onAiStatusClick }: Props) {
   const sizeText = path ? path : "未保存";
   return (
     <div className="statusbar">
@@ -39,6 +42,16 @@ export default function StatusBar({ line, col, selected, lines, encoding, bom, e
         </span>
       )}
       <span className="spacer" />
+      {aiStatus && (
+        <span
+          className={`status-item clickable ai-pill ${aiStatus.state}`}
+          title="点击回到 AI 面板"
+          onClick={() => onAiStatusClick?.()}
+        >
+          {aiStatus.state === "running" && <span className="spinner" />}
+          {aiStatus.label}
+        </span>
+      )}
       <span className="status-item">{language}</span>
       {typeof zoom === "number" && (
         <span

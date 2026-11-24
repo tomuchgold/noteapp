@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.26.0</title>
+<title>NotePP 功能手册 — v0.27.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.26.0</span>
+    <span class="ver-badge">v0.27.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.26.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.27.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.26.0</b></span>
+        <span>当前版本 <b>v0.27.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -221,7 +221,7 @@
       <div class="feature">
         <h3><span class="ic">🗃️</span>文件库与分类管理</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">打开过的文件自动进入文件库，可用带颜色的分类归档。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在左侧分类侧栏<b>新建分类</b>并指定颜色，右键文件<b>归类</b>，可<b>收藏置顶</b>与<b>搜索过滤</b>；所有数据本地持久化。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在左侧分类侧栏<b>新建分类</b>并指定颜色，右键文件<b>归类</b>，可<b>收藏置顶</b>与<b>搜索过滤</b>；<b>右键或双击分类名可重命名</b>（v0.27）。所有数据本地持久化。</span></div>
         <div class="path"><span class="badge">路径</span>左侧分类侧栏　<span class="badge">显隐</span><kbd>Ctrl+B</kbd></div>
       </div>
 
@@ -458,7 +458,7 @@ graph LR
 
       <div class="feature">
         <h3><span class="ic">👁️</span>渲染预览与导出带样式 HTML</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">所见即所得的渲染预览；非 Markdown 文件按纯文本预览；支持导出保留样式的 HTML。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">所见即所得的渲染预览；txt 等文本文件也按 Markdown 渲染（v0.27）；支持导出保留样式的 HTML。<b>图片 / 音频 / 视频的相对路径引用（如 <code>media/xxx.png</code>）按文档所在目录解析</b>，预览、导出 HTML、打印 PDF 中都能正常显示（v0.27 修复此前裂图问题）。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「预览」打开预览面板，从中导出 HTML，或直接打印成 PDF。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「预览」→ 导出带样式 HTML</div>
       </div>
@@ -589,8 +589,8 @@ graph LR
 
       <div class="feature">
         <h3><span class="ic">✨</span>AI 动作（选中文本右键触发）</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 7 个动作：<b>解释这段内容、润色改写、提炼要点、翻译成中文、翻译成英文、生成代码注释、自定义指令…</b>；回复流式显示，关闭弹窗即可取消。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在编辑器中选中文字 → 右键 → 选择 AI 动作；结果可<b>复制</b>、<b>插入光标处</b>或<b>替换原文</b>。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 7 个动作：<b>解释这段内容、润色改写、提炼要点、翻译成中文、翻译成英文、生成代码注释、自定义指令…</b>；回复流式显示。<b>v0.27 起 AI 完全不阻塞编辑</b>：结果面板是右下角浮窗，运行中可以继续编辑 / 切换文件；点面板右上 <b>▼</b> 收起到后台，状态栏出现「✨ 运行中 / 结果就绪」提示，点一下即可回到面板。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在编辑器中选中文字 → 右键 → 选择 AI 动作；期间可正常编辑；结果可<b>复制</b>、<b>插入光标处</b>或<b>替换原文</b>。</span></div>
         <div class="path"><span class="badge">路径</span>选中文本右键 → AI 动作</div>
       </div>
 
@@ -604,7 +604,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🔑</span>AI 服务商与 Key 配置</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 DeepSeek、Agnes AI、商汤日日新 SenseNova、智谱 GLM、月之暗面 Kimi、通义千问、OpenAI、OpenRouter、Ollama 本地及自定义 OpenAI 兼容网关；各厂商 Key 独立保存、随时切换。<b>模型列表可视化 + 角色分工</b>：拉取的模型以列表展示，点模型名 = 设为<b>对话/推理模型（💬）</b>，点 🖼 = 设为<b>生图模型</b>——同一家拉到的模型可分别担任两个角色；也可手动添加其他模型名（支持删除），拉取结果持久保存。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">菜单「AI」打开配置，选服务商、填 API Key，然后<b>拉取模型列表 → 在列表中点选模型</b>（或手动输入添加）；配置可<b>导出 / 导入 JSON</b>。调用报错时给出人话提示（如模型不存在 → 提示重新拉取列表点选）。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">菜单「AI」打开配置，选服务商、填 API Key，然后<b>拉取模型列表 → 在列表中点选模型</b>（或手动输入添加）；配置可<b>导出 / 导入 JSON</b>。调用报错时给出人话提示（如模型不存在 404、<b>400「该分组没有可用模型实例」</b>等 → 提示打开 AI 设置重新拉取列表，换一个实际开通的模型）。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「AI」→ 服务商与 Key 配置</div>
       </div>
     </section>
@@ -631,7 +631,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.26.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.27.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 
@@ -701,8 +701,8 @@ graph LR
 
       <div class="feature">
         <h3><span class="ic">🎨</span>AI 生图（菜单一键生成并插入）</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">菜单栏「🎨 生图」弹出<b>生图对话框</b>：提示词<b>自动预填当前选中的文字</b>（也可自己写，Ctrl+Enter 直发），生成后图片<b>落盘到文档旁 media/ 目录</b>（不再往文档里塞 base64 大字符串），插入相对引用 <code>![描述](media/ai-xxx.png)</code>。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">先在「AI 设置」选好<b>生图模型（🖼）</b>并填 Key；选中一段文字当提示词（或不选直接点生图），点「🎨 生图」→「生成并插入」。对话框里有<b>生图偏好快捷标签</b>（🧊 透明物品 / 🧻 白底产品 / 🎯 极简居中 / 🔍 高清细节）一键追加提示词。图片格式以服务商返回为准（jpg/png 自动按真实格式落盘）；想要小文件可在提示词里要求「白底产品图」后自行转存。文档未保存时提示先 Ctrl+S（落盘需要知道存哪）。失败给出人话错误。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">菜单栏「🎨 生图」弹出<b>生图对话框</b>：提示词<b>自动预填当前选中的文字</b>（也可自己写，Ctrl+Enter 直发），生成后图片<b>落盘到文档旁 media/ 目录</b>（不再往文档里塞 base64 大字符串），插入相对引用 <code>![ai-image-时间戳](media/ai-xxx.png)</code>（<b>v0.27 起方括号用英文标识符</b>，中文提示词不再进入引用，避免破坏 Markdown 链接）。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">先在「AI 设置」选好<b>生图模型（🖼）</b>并填 Key；选中一段文字当提示词（或不选直接点生图），点「🎨 生图」→「生成（后台运行）」——<b>点下立即关窗，生成期间可以正常编辑 / 浏览</b>，完成后图片自动插入光标处，状态栏显示「生图生成中… / 🎨 图片已插入」，失败时状态栏提示点击查看人话错误。对话框里有<b>生图偏好快捷标签</b>（🧊 透明物品 / 🧻 白底产品 / 🎯 极简居中 / 🔍 高清细节）一键追加提示词。图片格式以服务商返回为准（jpg/png 自动按真实格式落盘）。文档未保存时先 Ctrl+S（落盘需要知道存哪）。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「生图」/ AI 设置 → 生图模型</div>
       </div>
 

@@ -264,12 +264,15 @@ export default function App() {
     tokens?: number;
   } | null>(null);
   const [aiCustom, setAiCustom] = useState<{ source: string } | null>(null);
+  /** v0.27：AI 面板收起到后台（不阻塞编辑，状态栏点击恢复） */
+  const [aiMin, setAiMin] = useState(false);
   useEffect(() => saveAiConfig(aiConfig), [aiConfig]);
   const aiReady = isConfigured(aiConfig);
 
   const runAi = useCallback(
     async (action: AiAction, source: string, custom?: string) => {
       const title = AI_ACTIONS.find((a) => a.id === action)?.label ?? "AI 操作";
+      setAiMin(false);
       setAiJob({ title, action, source, custom, loading: true, error: null, result: "" });
       try {
         const res = await runAiActionStream(aiConfig, action, source, custom, (delta) => {
@@ -336,6 +339,7 @@ export default function App() {
     actionCount.current += 1;
     setActionSignal({ type: mode, n: actionCount.current, text });
     setAiJob(null);
+    setAiMin(false);
   }, []);
 
   useEffect(() => saveLibrary(library), [library]);
@@ -827,7 +831,8 @@ export default function App() {
       activeTab.content,
       activeTab.name.replace(/\.[^.]+$/, ""),
       effectiveFontSize(editorSettings),
-      /\.(md|markdown)$/i.test(activeTab.name)
+      /\.(md|markdown|txt)$/i.test(activeTab.name),
+      activeTab.path ? dirName(activeTab.path) : null
     );
   }, [activeTab, editorSettings]);
 
@@ -911,11 +916,12 @@ export default function App() {
     for (const p of paths) await insertMedia(p);
   }, [insertMedia]);
 
-  // ---------- AI 生图（v0.19；v0.24 改为对话框：WebView 不支持 window.prompt，之前点了没反应） ----------
+  // ---------- AI 生图（v0.19；v0.24 改对话框；v0.27 后台生成：点生成立即关窗继续编辑，完成后自动插入并在状态栏提示） ----------
   const aiImgReady = isImageReady(aiConfig);
   const [imgGenerating, setImgGenerating] = useState(false);
   const [imgPromptOpen, setImgPromptOpen] = useState(false);
   const [imgPromptText, setImgPromptText] = useState("");
+  const [imgDone, setImgDone] = useState<string | null>(null);
   const handleImageGen = useCallback(async () => {
     if (!activeTab) return;
     if (activeTab.readOnly) {
@@ -940,40 +946,62 @@ export default function App() {
       setImgErr("请先输入图片描述（提示词），例如：赛博朋克风格的城市夜景，霓虹灯，雨夜");
       return;
     }
+    if (!activeTab?.path) {
+      setImgErr("生成的图片要保存到文档旁 media/ 目录，当前文档尚未保存。\n请先用 Ctrl+S 保存文档，再生成。");
+      return;
+    }
     setImgGenerating(true);
     setImgErr(null);
+    setImgDone(null);
+    setImgPromptOpen(false); // v0.27：点生成立即关闭对话框，生成在后台进行，期间可正常编辑/浏览
     try {
       const urls = await runImageGen(aiConfig, desc, 1);
       if (urls.length === 0) throw new Error("API 未返回图片");
       let url = urls[0];
       // v0.25：base64/dataURL 不再直接塞进文档——解码落盘到文档旁 media/，插入相对引用
       if (url.startsWith("data:")) {
-        if (!activeTab?.path) {
-          setImgGenerating(false);
-          setImgErr("生成的图片需要保存到文档旁 media/ 目录，但当前文档尚未保存到磁盘。\n请先用 Ctrl+S 保存文档，再重新生成。");
-          return;
-        }
-        if (activeTab.readOnly) {
-          setImgGenerating(false);
-          setImgErr("大文件模式为只读，无法保存生成的图片。");
-          return;
-        }
+        if (activeTab.readOnly) throw new Error("大文件模式为只读，无法保存生成的图片。");
         const m = /^data:image\/([a-z0-9+]+);base64,(.+)$/i.exec(url);
         const ext = m?.[1]?.replace("jpeg", "jpg") ?? "png";
         const b64 = m?.[2] ?? url;
-        const rel = await saveImageB64(activeTab.path, b64, ext);
+        url = await saveImageB64(activeTab.path, b64, ext);
         // media/ 目录可能新建 → 刷新文件夹树
         if (folderRoot && isUnderFolderRoot(activeTab.path, folderRoot)) setFolderReloadKey((k) => k + 1);
-        url = rel;
       }
-      setImgPromptOpen(false);
-      insertText(`\n![${desc.slice(0, 40)}](${url})\n`);
+      // v0.27：方括号（alt 文本）改用英文标识符 ai-image-时间戳，
+      // 中文提示词不再进入引用，避免长描述/特殊字符破坏 Markdown 链接
+      const d = new Date();
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      const stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+      insertText(`\n![ai-image-${stamp}](${url})\n`);
+      setImgDone("图片已插入到光标处");
+      window.setTimeout(() => setImgDone(null), 6000);
     } catch (e) {
       setImgErr(friendlyAiError(e, resolveConfig(aiConfig).imgModel));
     } finally {
       setImgGenerating(false);
     }
   }, [imgPromptText, aiConfig, insertText, activeTab, folderRoot, isUnderFolderRoot]);
+
+  // v0.27：AI/生图任务在状态栏的汇总提示（不阻塞编辑，点击回到面板）
+  const aiStatusPill: { state: "running" | "done" | "error"; label: string } | null = useMemo(() => {
+    if (imgGenerating) return { state: "running", label: "生图生成中…" };
+    if (imgErr) return { state: "error", label: "生图失败·点击查看" };
+    if (imgDone) return { state: "done", label: `🎨 ${imgDone}` };
+    if (aiJob) {
+      if (aiJob.loading) return { state: "running", label: `✨ ${aiJob.title}运行中…` };
+      if (aiMin) return { state: aiJob.error ? "error" : "done", label: `✨ ${aiJob.title}${aiJob.error ? "出错·点击查看" : "结果就绪·点击查看"}` };
+    }
+    return null;
+  }, [imgGenerating, imgErr, imgDone, aiJob, aiMin]);
+
+  const onAiStatusClick = useCallback(() => {
+    if (imgGenerating || imgErr || imgDone) {
+      setImgPromptOpen(true);
+      return;
+    }
+    if (aiJob) setAiMin(false);
+  }, [imgGenerating, imgErr, imgDone, aiJob]);
 
   /** 判断拖入路径是当文本打开，还是作为媒体/附件插入引用 */
   const isTextFilePath = (p: string): boolean => {
@@ -2349,6 +2377,8 @@ export default function App() {
           language={lang.name}
           path={activeTab.path}
           zoom={editorSettings.zoom}
+          aiStatus={aiStatusPill}
+          onAiStatusClick={onAiStatusClick}
         />
       )}
         </div>
@@ -2478,18 +2508,19 @@ export default function App() {
           title={activeTab.name}
           source={activeTab.content}
           fontSize={effectiveFontSize(editorSettings)}
+          mediaDir={activeTab.path ? dirName(activeTab.path) : null}
           onExportHtml={exportPreviewHtml}
           onClose={() => setPreviewOpen(false)}
         />
       )}
 
-      {/* AI 生图对话框（v0.24：替代 window.prompt——WebView 不支持） */}
+      {/* AI 生图对话框（v0.27：生成在后台运行，可随时关闭继续编辑，状态栏显示进度） */}
       {imgPromptOpen && (
-        <div className="modal-mask" onClick={() => !imgGenerating && setImgPromptOpen(false)}>
+        <div className="modal-mask" onClick={() => setImgPromptOpen(false)}>
           <div className="modal img-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2>🎨 AI 生图</h2>
-              <button className="icon-btn" onClick={() => setImgPromptOpen(false)} disabled={imgGenerating} title="关闭">
+              <button className="icon-btn" onClick={() => setImgPromptOpen(false)} title="关闭">
                 ×
               </button>
             </div>
@@ -2511,7 +2542,9 @@ export default function App() {
                 />
               </label>
               <p className="hint">
-                生图模型：<b>{resolveConfig(aiConfig).imgModel || "未配置"}</b>（在「AI 设置」中修改）；Ctrl+Enter 直接生成
+                生图模型：<b>{resolveConfig(aiConfig).imgModel || "未配置"}</b>（在「AI 设置」中修改）；Ctrl+Enter 直接生成。
+                <br />
+                生成在<b>后台</b>进行：可先关闭本窗口继续编辑/浏览，完成后自动插入光标处，状态栏会显示进度。
               </p>
               <div className="img-prefs">
                 <span className="img-prefs-label">生图偏好（点击追加到提示词）：</span>
@@ -2536,11 +2569,11 @@ export default function App() {
             </div>
             <div className="modal-foot">
               <div className="grow" />
-              <button onClick={() => setImgPromptOpen(false)} disabled={imgGenerating}>
+              <button onClick={() => setImgPromptOpen(false)}>
                 取消
               </button>
-              <button className="primary" onClick={() => void doImageGen()} disabled={imgGenerating || !imgPromptText.trim()}>
-                {imgGenerating ? "生成中…（最长 2 分钟）" : "🎨 生成并插入"}
+              <button className="primary" onClick={() => void doImageGen()} disabled={!imgPromptText.trim()} title="立即关窗后台生成，完成后自动插入到光标处">
+                🎨 生成（后台运行）
               </button>
             </div>
           </div>
@@ -2583,8 +2616,8 @@ export default function App() {
         />
       )}
 
-      {/* AI 结果 */}
-      {aiJob && (
+      {/* AI 结果（v0.27：非阻塞浮窗——点 ▼ 收起到后台继续编辑，状态栏点击恢复） */}
+      {aiJob && !aiMin && (
         <AiResultDialog
           title={aiJob.title}
           source={aiJob.source}
@@ -2595,8 +2628,9 @@ export default function App() {
           tokens={aiJob.tokens}
           onReplace={(t) => writeAiText("ai-replace", t)}
           onInsert={(t) => writeAiText("ai-insert", t)}
-          onClose={() => setAiJob(null)}
+          onClose={() => { setAiJob(null); setAiMin(false); }}
           onRetry={() => void runAi(aiJob.action, aiJob.source, aiJob.custom)}
+          onMinimize={() => setAiMin(true)}
         />
       )}
 

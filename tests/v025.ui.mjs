@@ -109,7 +109,7 @@ check("提示词预填选中的文字", prefill === "写作者的日常", `v="${
 
 // ---------- 3. b64 落盘：data URL → media/ 相对引用 ----------
 await page.evaluate(() => { window.__imageCalls = []; window.__saveB64Calls = []; });
-await page.locator(".modal.img-dialog button", { hasText: "生成并插入" }).click();
+await page.locator(".modal.img-dialog button", { hasText: "后台运行" }).click();
 await page.waitForTimeout(700);
 check("ai_image 已调用", (await page.evaluate(() => window.__imageCalls.length)) === 1);
 const saveCalls = await page.evaluate(() => window.__saveB64Calls);
@@ -121,7 +121,7 @@ await page.locator(".cm-line").first().click();
 await page.keyboard.press("Control+Home");
 await page.keyboard.press("ArrowDown");
 await page.waitForTimeout(250);
-check("插入相对引用 media/ai-xxx.png", (await editorText()).includes("![写作者的日常](media/ai-1763900000000.png)"));
+check("插入相对引用 media/ai-xxx.png", (await editorText()).includes("![ai-image-") && (await editorText()).includes("](media/ai-1763900000000.png)"));
 
 // ---------- 4. 未保存文档：提示先保存而不是塞 base64 ----------
 await page.locator(".menubar button", { hasText: "新建" }).first().click();
@@ -130,7 +130,7 @@ await page.evaluate(() => { window.__imageCalls = []; window.__saveB64Calls = []
 await page.locator(".menubar button", { hasText: "生图" }).first().click();
 await page.waitForTimeout(300);
 await page.locator(".modal.img-dialog textarea").fill("测试未保存");
-await page.locator(".modal.img-dialog button", { hasText: "生成并插入" }).click();
+await page.locator(".modal.img-dialog button", { hasText: "后台运行" }).click();
 await page.waitForTimeout(600);
 check("未保存时给出提示", (await page.locator(".modal.img-dialog .msg.err").innerText().catch(() => "")).includes("尚未保存"));
 check("未保存时未落盘", (await page.evaluate(() => window.__saveB64Calls.length)) === 0);

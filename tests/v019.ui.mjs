@@ -108,7 +108,7 @@ await page.locator(".menubar button", { hasText: "生图" }).first().click();
 await page.waitForTimeout(300);
 check("生图弹出对话框（不再用 window.prompt）", await page.locator(".modal.img-dialog").isVisible().catch(() => false));
 await page.locator(".modal.img-dialog textarea").fill("一只戴眼镜的小猫");
-await page.locator(".modal.img-dialog button", { hasText: "生成并插入" }).click();
+await page.locator(".modal.img-dialog button", { hasText: "后台运行" }).click();
 await page.waitForTimeout(600);
 const calls = await page.evaluate(() => window.__imageCalls);
 check("已调用 ai_image", (await page.evaluate(() => window.__imageCalls.length)) === 1, JSON.stringify(calls));
@@ -122,7 +122,7 @@ await page.keyboard.press("ArrowUp");
 await page.keyboard.press("ArrowUp");
 await page.waitForTimeout(200);
 const txt = await editorText();
-check("光标处插入图片引用（原文可见）", txt.includes("![一只戴眼镜的小猫](https://img.example.com/cat.png)"), JSON.stringify(txt.slice(-70)));
+check("光标处插入图片引用（原文可见）", txt.includes("![ai-image-") && txt.includes("](https://img.example.com/cat.png)"), JSON.stringify(txt.slice(-70)));
 
 // ---------- 3. 光标移开后该行渲染为缩略图 ----------
 await page.keyboard.press("Control+End");

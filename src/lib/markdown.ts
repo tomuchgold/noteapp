@@ -10,6 +10,7 @@
 import { marked } from "marked";
 import hljs from "highlight.js/lib/common";
 import katex from "katex";
+import { resolveMediaSrc } from "./mediaView";
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -64,6 +65,28 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+const MEDIA_SRC_RE = /(<(?:img|audio|video|source)\b[^>]*?\bsrc\s*=\s*)("(?:[^"]*)"|'(?:[^']*)')/gi;
+const ABS_SRC_RE = /^(https?|data|blob|asset):/i;
+
+/**
+ * 把渲染结果里的相对媒体引用（img/audio/video/source 的 src）
+ * 按文档所在目录解析为可加载的 src（v0.27：修复预览里相对路径图片不显示——
+ * WebView 下 <img src="media/x.png"> 会指向应用内部地址而非文档目录）。
+ */
+function resolveMediaSrcs(html: string, mediaDir: string | null | undefined): string {
+  if (!mediaDir) return html;
+  return html.replace(MEDIA_SRC_RE, (whole, lead: string, quoted: string) => {
+    const quote = quoted[0];
+    const ref = quoted.slice(1, -1);
+    if (!ref || ABS_SRC_RE.test(ref)) return whole;
+    try {
+      return `${lead}${quote}${resolveMediaSrc(ref, mediaDir)}${quote}`;
+    } catch {
+      return whole;
+    }
+  });
+}
+
 const renderer = {
   /** 代码块：mermaid → 占位节点；其余 → highlight.js 染色 */
   code({ text, lang }: { text: string; lang?: string }) {
@@ -86,8 +109,9 @@ const renderer = {
 
 marked.use({ renderer: renderer as never });
 
-export function markdownToHtml(source: string): string {
-  return marked.parse(preprocessMath(source), { async: false }) as string;
+export function markdownToHtml(source: string, opts?: { mediaDir?: string | null }): string {
+  const html = marked.parse(preprocessMath(source), { async: false }) as string;
+  return resolveMediaSrcs(html, opts?.mediaDir);
 }
 
 /**

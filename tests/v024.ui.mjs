@@ -144,7 +144,7 @@ check("对话框显示生图模型", (await page.locator(".modal.img-dialog .hin
 check("空提示词时生成按钮禁用", await page.locator(".modal.img-dialog button.primary").isDisabled());
 // 填提示词生成
 await page.locator(".modal.img-dialog textarea").fill("测试生图描述词");
-await page.locator(".modal.img-dialog button", { hasText: "生成并插入" }).click();
+await page.locator(".modal.img-dialog button", { hasText: "后台运行" }).click();
 await page.waitForTimeout(600);
 check("ai_image 已调用", (await page.evaluate(() => window.__imageCalls.length)) === 1);
 check("生成后对话框关闭", !(await page.locator(".modal.img-dialog").isVisible().catch(() => false)));
@@ -153,7 +153,7 @@ await page.locator(".cm-line").first().click();
 await page.keyboard.press("Control+Home");
 await page.keyboard.press("ArrowDown");
 await page.waitForTimeout(250);
-check("图片引用插入（光标移到该行显示原文）", (await editorText()).includes("![测试生图描述词](https://img.example.com/x.png)"));
+check("图片引用插入（光标移到该行显示原文）", (await editorText()).includes("![ai-image-") && (await editorText()).includes("](https://img.example.com/x.png)"));
 
 // ---------- 3. 友好报错（404 model not found） ----------
 // 选中文本 → 右键 → AI 润色（选第 3 行正文，避开图片组件行）

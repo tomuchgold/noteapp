@@ -8,9 +8,10 @@ export function printDocument(
   source: string,
   title: string,
   fontSize: number,
-  isMarkdown: boolean
+  isMarkdown: boolean,
+  mediaDir?: string | null
 ): void {
-  const doc = exportHtmlPayload(source, title, fontSize, isMarkdown);
+  const doc = exportHtmlPayload(source, title, fontSize, isMarkdown, mediaDir);
   const old = document.getElementById("notepp-print-frame");
   if (old) old.remove();
 

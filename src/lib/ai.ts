@@ -340,6 +340,10 @@ export function friendlyAiError(e: unknown, model?: string): string {
   const m = model ?? "";
   if (/model is not found|model_not_found/i.test(raw) || (/404/.test(raw) && /model/i.test(raw)))
     return `模型「${m || "当前模型"}」在该服务商不存在（404）。\n常见原因：切换服务商后模型名没跟着换、模型名拼写不对、该模型未在服务商控制台开通。\n解决办法：打开「AI 设置」→ 点「拉取模型列表」→ 从列表里点选一个模型，保存后重试。`;
+  if (/no available model instance|matched user group|failed_precondition/i.test(raw))
+    return `当前模型没有可用实例（400 failed_precondition）。\n常见原因：模型名不在你的套餐/分组内、模型未开通或已下线、中转站没有配置该模型的上游渠道。\n解决办法：打开「AI 设置」→ 点「拉取模型列表」→ 换一个实际开通的模型；自建中转请检查该模型的渠道配置。`;
+  if (/400/.test(raw) && /model/i.test(raw))
+    return `模型参数被网关拒绝（400）：模型「${m || "当前模型"}」可能不可用或名称不正确。\n解决办法：打开「AI 设置」→ 点「拉取模型列表」→ 点选一个列表里实际存在的模型。`;
   if (/401|invalid.*key|unauthorized/i.test(raw))
     return "API Key 无效或未授权（401）：请检查 Key 是否复制完整、是否属于当前服务商。";
   if (/429|rate.?limit/i.test(raw)) return "请求过于频繁或额度用尽（429）：稍后重试，或到服务商后台检查余额/限额。";

@@ -8,6 +8,8 @@ interface Props {
   source: string;
   /** 正文字号 px（含缩放，导出大字打印用） */
   fontSize?: number;
+  /** 文档所在目录：预览/导出时按它解析相对媒体引用（v0.27） */
+  mediaDir?: string | null;
   /** 导出 HTML（Tauri 内走系统保存对话框；缺省用浏览器下载） */
   onExportHtml?: (html: string) => void;
   onClose: () => void;
@@ -43,18 +45,24 @@ ${bodyHtml}
 </html>`;
 }
 
-export function exportHtmlPayload(source: string, title: string, fontSize: number, isMarkdown = true): string {
+export function exportHtmlPayload(
+  source: string,
+  title: string,
+  fontSize: number,
+  isMarkdown = true,
+  mediaDir?: string | null
+): string {
   const body = isMarkdown
-    ? markdownToHtml(source)
+    ? markdownToHtml(source, { mediaDir })
     : `<pre style="white-space:pre-wrap">${source.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
   return buildHtmlDoc(body, title, fontSize);
 }
 
-export default function PreviewDialog({ title, source, fontSize = 14, onExportHtml, onClose }: Props) {
-  const isMarkdown = /\.(md|markdown)$/i.test(title);
+export default function PreviewDialog({ title, source, fontSize = 14, mediaDir = null, onExportHtml, onClose }: Props) {
+  const isMarkdown = /\.(md|markdown|txt)$/i.test(title);
   const html = useMemo(() => {
     try {
-      if (isMarkdown) return markdownToHtml(source);
+      if (isMarkdown) return markdownToHtml(source, { mediaDir });
       // 非 markdown：转义后按纯文本段落渲染
       const esc = source.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       return `<pre style="white-space:pre-wrap">${esc}</pre>`;
@@ -71,7 +79,7 @@ export default function PreviewDialog({ title, source, fontSize = 14, onExportHt
   }, [html]);
 
   const exportHtml = () => {
-    const doc = exportHtmlPayload(source, title, fontSize, isMarkdown);
+    const doc = exportHtmlPayload(source, title, fontSize, isMarkdown, mediaDir);
     if (onExportHtml) {
       onExportHtml(doc);
       return;

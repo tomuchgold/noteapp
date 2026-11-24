@@ -13,6 +13,8 @@ interface Props {
   onInsert: (text: string) => void;
   onClose: () => void;
   onRetry?: () => void;
+  /** 收起到后台（v0.27：AI 运行/结果不阻塞编辑，状态栏可点回） */
+  onMinimize?: () => void;
 }
 
 export default function AiResultDialog({
@@ -27,6 +29,7 @@ export default function AiResultDialog({
   onInsert,
   onClose,
   onRetry,
+  onMinimize,
 }: Props) {
   const [text, setText] = useState(result);
   const [copied, setCopied] = useState(false);
@@ -47,10 +50,16 @@ export default function AiResultDialog({
   }
 
   return (
-    <div className="modal-mask" onClick={onClose}>
+    <div className="modal-mask ai-float">
       <div className="modal ai-result" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>{title}</h2>
+          <div className="grow" />
+          {onMinimize && (
+            <button className="icon-btn" onClick={onMinimize} title="收起到后台：不挡编辑，AI 继续运行，状态栏可点回">
+              ▼
+            </button>
+          )}
           <button className="icon-btn" onClick={onClose} title="关闭">
             ×
           </button>
