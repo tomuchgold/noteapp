@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   PROVIDERS,
   defaultProviderConfig,
@@ -22,16 +22,16 @@ interface Props {
 
 export default function AiSettingsDialog({ config, onSave, onClose }: Props) {
   const [draft, setDraft] = useState<AiConfig>(() => JSON.parse(JSON.stringify(config)) as AiConfig);
-  const [models, setModels] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [newModel, setNewModel] = useState("");
 
   const preset = providerPreset(draft.active);
   const cfg: ProviderConfig = { ...defaultProviderConfig(preset), ...(draft.providers[draft.active] ?? {}) };
 
-  useEffect(() => {
-    setModels([]);
-  }, [draft.active]);
+  // 展示的模型列表：拉取到的（已持久化）→ 预设，另加手动添加的自定义模型
+  const modelList = Array.from(new Set([...(cfg.fetchedModels ?? []), ...(cfg.extraModels ?? []), ...preset.models]));
+  const currentModel = cfg.model;
 
   function patchCfg(patch: Partial<ProviderConfig>) {
     setDraft((d) => ({
@@ -54,13 +54,32 @@ export default function AiSettingsDialog({ config, onSave, onClose }: Props) {
     setMsg(null);
     try {
       const list = await fetchModels(cfg.baseUrl, cfg.apiKey);
-      setModels(list);
-      setMsg({ type: "ok", text: `拉取到 ${list.length} 个模型` });
+      // 持久化拉取结果（保存后仍可见），并自动补进 extraModels 若为空
+      patchCfg({ fetchedModels: list });
+      setMsg({ type: "ok", text: `拉取到 ${list.length} 个模型，已列入下方模型列表（点选即用）` });
     } catch (e) {
       setMsg({ type: "err", text: String(e instanceof Error ? e.message : e) });
     } finally {
       setBusy(false);
     }
+  }
+
+  function addCustomModel() {
+    const m = newModel.trim();
+    if (!m) return;
+    if (modelList.includes(m)) {
+      patchCfg({ model: m });
+      setNewModel("");
+      return;
+    }
+    patchCfg({ extraModels: [...(cfg.extraModels ?? []), m], model: m });
+    setNewModel("");
+    setMsg({ type: "ok", text: `已添加并选用模型 ${m}` });
+  }
+
+  function removeExtraModel(m: string) {
+    const next = (cfg.extraModels ?? []).filter((x) => x !== m);
+    patchCfg({ extraModels: next, ...(cfg.model === m ? { model: next[0] ?? preset.models[0] ?? "" } : {}) });
   }
 
   async function doExport() {
@@ -137,7 +156,7 @@ export default function AiSettingsDialog({ config, onSave, onClose }: Props) {
           </label>
 
           <label className="field">
-            <span>模型</span>
+            <span>模型（当前：{currentModel || "未选择"}）</span>
             <input
               value={cfg.model}
               list="ai-model-options"
@@ -145,11 +164,48 @@ export default function AiSettingsDialog({ config, onSave, onClose }: Props) {
               onChange={(e) => patchCfg({ model: e.target.value })}
             />
             <datalist id="ai-model-options">
-              {(models.length ? models : preset.models).map((m) => (
+              {modelList.map((m) => (
                 <option key={m} value={m} />
               ))}
             </datalist>
           </label>
+
+          {/* v0.24：可视化模型列表——点选即用，来源为「拉取 + 预设 + 手动添加」 */}
+          <div className="field">
+            <span>模型列表（点击选用；{cfg.fetchedModels?.length ? "含拉取结果" : "预设模型，可点下方「拉取模型列表」刷新"}）</span>
+            <div className="model-list">
+              {modelList.length === 0 && <p className="hint">暂无模型，点「拉取模型列表」或手动添加。</p>}
+              {modelList.map((m) => (
+                <div key={m} className={`model-chip ${m === currentModel ? "on" : ""}`}>
+                  <button type="button" className="model-pick" title={`选用 ${m}`} onClick={() => patchCfg({ model: m })}>
+                    {m === currentModel ? "✓ " : ""}
+                    {m}
+                  </button>
+                  {(cfg.extraModels ?? []).includes(m) && (
+                    <button type="button" className="model-del" title="移除此自定义模型" onClick={() => removeExtraModel(m)}>
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="model-add">
+              <input
+                value={newModel}
+                placeholder="手动添加其他模型名，如 claude-sonnet-4-5"
+                onChange={(e) => setNewModel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomModel();
+                  }
+                }}
+              />
+              <button type="button" onClick={addCustomModel}>
+                ＋ 添加并选用
+              </button>
+            </div>
+          </div>
 
           <label className="field">
             <span>生图模型（可选，AI 生图用）</span>

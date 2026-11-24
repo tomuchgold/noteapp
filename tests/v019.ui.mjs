@@ -102,12 +102,13 @@ await page.keyboard.press("Escape");
 await page.locator(".modal.ai-settings .icon-btn").click().catch(() => {});
 await page.waitForTimeout(200);
 
-// ---------- 2b. 配置后生图 → 调 ai_image 并插入引用 ----------
+// ---------- 2b. 配置后生图 → 对话框输入提示词 → 调 ai_image 并插入引用 ----------
 await page.evaluate(() => { window.__imageCalls = []; });
-await page.evaluate(() => {
-  window.prompt = () => "一只戴眼镜的小猫";
-});
 await page.locator(".menubar button", { hasText: "生图" }).first().click();
+await page.waitForTimeout(300);
+check("生图弹出对话框（不再用 window.prompt）", await page.locator(".modal.img-dialog").isVisible().catch(() => false));
+await page.locator(".modal.img-dialog textarea").fill("一只戴眼镜的小猫");
+await page.locator(".modal.img-dialog button", { hasText: "生成并插入" }).click();
 await page.waitForTimeout(600);
 const calls = await page.evaluate(() => window.__imageCalls);
 check("已调用 ai_image", (await page.evaluate(() => window.__imageCalls.length)) === 1, JSON.stringify(calls));

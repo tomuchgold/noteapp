@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.23.2</title>
+<title>NotePP 功能手册 — v0.24.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.23.2</span>
+    <span class="ver-badge">v0.24.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.23.2，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.24.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.23.2</b></span>
+        <span>当前版本 <b>v0.24.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -603,8 +603,8 @@ graph LR
 
       <div class="feature">
         <h3><span class="ic">🔑</span>AI 服务商与 Key 配置</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 DeepSeek、Agnes AI、商汤日日新 SenseNova、智谱 GLM、月之暗面 Kimi、通义千问、OpenAI、OpenRouter、Ollama 本地及自定义 OpenAI 兼容网关；各厂商 Key 独立保存、随时切换，支持「拉取模型列表」。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">菜单「AI」打开配置，选服务商、填 API Key 与模型；配置可<b>导出 / 导入 JSON</b>。请求由应用直连所选厂商服务器，无额外遥测，文件与标注均在本地。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 DeepSeek、Agnes AI、商汤日日新 SenseNova、智谱 GLM、月之暗面 Kimi、通义千问、OpenAI、OpenRouter、Ollama 本地及自定义 OpenAI 兼容网关；各厂商 Key 独立保存、随时切换。<b>模型列表可视化</b>：点「拉取模型列表」后所有模型以列表形式展示，点一下即选用；也可手动添加其他模型名（支持删除），拉取结果持久保存。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">菜单「AI」打开配置，选服务商、填 API Key，然后<b>拉取模型列表 → 在列表中点选模型</b>（或手动输入添加）；配置可<b>导出 / 导入 JSON</b>。调用报错时给出人话提示（如模型不存在 → 提示重新拉取列表点选）。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「AI」→ 服务商与 Key 配置</div>
       </div>
     </section>
@@ -631,13 +631,13 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.23.2</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.24.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 
       <div class="feature">
         <h3><span class="ic">💾</span>会话恢复</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">重启应用后自动还原上次打开的标签页，接着上次的工作继续。<b>v0.23.2 起：没保存的也不会丢</b>——新建未保存的文件、已保存文件里未落盘的修改，重启后都会原样恢复（单个草稿上限 500KB）。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">重启应用后自动还原上次打开的标签页，接着上次的工作继续。<b>v0.24.0 起：没保存的也不会丢</b>——新建未保存的文件、已保存文件里未落盘的修改，重启后都会原样恢复（单个草稿上限 500KB）。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">无需设置，重新打开应用即自动恢复。</span></div>
         <div class="path"><span class="badge">路径</span>自动生效</div>
       </div>
@@ -701,8 +701,8 @@ graph LR
 
       <div class="feature">
         <h3><span class="ic">🎨</span>AI 生图（菜单一键生成并插入）</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">菜单栏「🎨 生图」：输入图片描述，AI 生成图片并在光标处插入引用 <code>![描述](url)</code>；走 OpenAI 兼容 <code>/images/generations</code> 接口，b64 返回自动转 data URL。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">先在「AI 设置」填好 API 地址、Key 与<b>生图模型</b>（Agnes 预设 agnes-image-2.5-flash，也可填 dall-e-3 等）；点「🎨 生图」→ 输入描述 → 图片自动插入。生成失败会弹出原因，支持 503 服务繁忙重试。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">菜单栏「🎨 生图」弹出<b>生图对话框</b>：在提示词输入框描述想要的图片（支持 Ctrl+Enter 直发生成），生成后自动插入光标处 <code>![描述](url)</code>；走 OpenAI 兼容 <code>/images/generations</code> 接口，b64 返回自动转 data URL。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">先在「AI 设置」填好 API 地址、Key 与<b>生图模型</b>（Agnes 预设 agnes-image-2.5-flash，也可填 dall-e-3 等）；点「🎨 生图」→ 对话框输入描述 → 点「生成并插入」。生成中按钮显示进度，失败给出人话错误（模型不存在/Key 无效/超时各有对应建议）。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「生图」/ AI 设置 → 生图模型</div>
       </div>
 

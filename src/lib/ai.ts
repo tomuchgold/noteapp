@@ -115,6 +115,10 @@ export interface ProviderConfig {
   model: string;
   /** 生图模型（AI 生图用，可留空表示不支持） */
   imgModel?: string;
+  /** 从服务商拉取到的模型列表（v0.24 持久化，界面可视化选择） */
+  fetchedModels?: string[];
+  /** 手动添加的自定义模型（与拉取列表合并展示） */
+  extraModels?: string[];
 }
 
 export interface AiConfig {
@@ -330,6 +334,21 @@ export async function runImageGen(config: AiConfig, prompt: string, n = 1, size?
   return res.urls;
 }
 
+/** 把底层报错翻译成人话（v0.24：常见错误给出可操作建议） */
+export function friendlyAiError(e: unknown, model?: string): string {
+  const raw = String(e instanceof Error ? e.message : e);
+  const m = model ?? "";
+  if (/model is not found|model_not_found/i.test(raw) || (/404/.test(raw) && /model/i.test(raw)))
+    return `模型「${m || "当前模型"}」在该服务商不存在（404）。\n常见原因：切换服务商后模型名没跟着换、模型名拼写不对、该模型未在服务商控制台开通。\n解决办法：打开「AI 设置」→ 点「拉取模型列表」→ 从列表里点选一个模型，保存后重试。`;
+  if (/401|invalid.*key|unauthorized/i.test(raw))
+    return "API Key 无效或未授权（401）：请检查 Key 是否复制完整、是否属于当前服务商。";
+  if (/429|rate.?limit/i.test(raw)) return "请求过于频繁或额度用尽（429）：稍后重试，或到服务商后台检查余额/限额。";
+  if (/timeout|timed out/i.test(raw)) return "请求超时：网络不通或代理未开启，请检查网络/代理后重试。";
+  if (/failed to fetch|connection|ECONNREFUSED|dns/i.test(raw))
+    return "无法连接到服务商：检查 API 地址是否正确、网络/代理是否可用（OpenAI 等国内需代理）。";
+  return raw;
+}
+
 /** 导出配置（含 Key，明文，导入前请确认接收方可信） */
 export function exportAiConfig(c: AiConfig): string {
   return JSON.stringify(
@@ -359,6 +378,9 @@ export function importAiConfig(json: string): AiConfig {
       apiKey: typeof cfg.apiKey === "string" ? cfg.apiKey : "",
       baseUrl: typeof cfg.baseUrl === "string" ? cfg.baseUrl : "",
       model: typeof cfg.model === "string" ? cfg.model : "",
+      imgModel: typeof cfg.imgModel === "string" ? cfg.imgModel : undefined,
+      fetchedModels: Array.isArray(cfg.fetchedModels) ? cfg.fetchedModels.filter((m) => typeof m === "string") : undefined,
+      extraModels: Array.isArray(cfg.extraModels) ? cfg.extraModels.filter((m) => typeof m === "string") : undefined,
     };
   }
   const active = PROVIDERS.some((p) => p.id === data.active) ? (data.active as ProviderId) : "deepseek";

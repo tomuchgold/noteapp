@@ -53,6 +53,7 @@ import UpdateDialog from "./components/UpdateDialog";
 import { checkUpdate, type UpdateInfo } from "./lib/update";
 import {
   AI_ACTIONS,
+  friendlyAiError,
   isConfigured,
   isImageReady,
   loadAiConfig,
@@ -277,7 +278,7 @@ export default function App() {
         );
       } catch (e) {
         setAiJob((j) =>
-          j ? { ...j, loading: false, error: String(e instanceof Error ? e.message : e) } : j
+          j ? { ...j, loading: false, error: friendlyAiError(e, resolveConfig(aiConfig).model) } : j
         );
       }
     },
@@ -908,9 +909,11 @@ export default function App() {
     for (const p of paths) await insertMedia(p);
   }, [insertMedia]);
 
-  // ---------- AI 生图（v0.19） ----------
+  // ---------- AI 生图（v0.19；v0.24 改为对话框：WebView 不支持 window.prompt，之前点了没反应） ----------
   const aiImgReady = isImageReady(aiConfig);
   const [imgGenerating, setImgGenerating] = useState(false);
+  const [imgPromptOpen, setImgPromptOpen] = useState(false);
+  const [imgPromptText, setImgPromptText] = useState("");
   const handleImageGen = useCallback(async () => {
     if (!activeTab) return;
     if (activeTab.readOnly) {
@@ -922,19 +925,31 @@ export default function App() {
       setAiSettingsOpen(true);
       return;
     }
-    const desc = window.prompt("AI 生图：请输入图片描述", "");
-    if (!desc || !desc.trim()) return;
+    setImgErr(null);
+    setImgPromptText("");
+    setImgPromptOpen(true);
+  }, [activeTab, aiImgReady]);
+
+  const [imgErr, setImgErr] = useState<string | null>(null);
+  const doImageGen = useCallback(async () => {
+    const desc = imgPromptText.trim();
+    if (!desc) {
+      setImgErr("请先输入图片描述（提示词），例如：赛博朋克风格的城市夜景，霓虹灯，雨夜");
+      return;
+    }
     setImgGenerating(true);
+    setImgErr(null);
     try {
-      const urls = await runImageGen(aiConfig, desc.trim(), 1);
+      const urls = await runImageGen(aiConfig, desc, 1);
       if (urls.length === 0) throw new Error("API 未返回图片");
-      insertText(`\n![${desc.trim().slice(0, 40)}](${urls[0]})\n`);
+      setImgPromptOpen(false);
+      insertText(`\n![${desc.slice(0, 40)}](${urls[0]})\n`);
     } catch (e) {
-      alert(`AI 生图失败：${e instanceof Error ? e.message : e}`);
+      setImgErr(friendlyAiError(e, resolveConfig(aiConfig).imgModel));
     } finally {
       setImgGenerating(false);
     }
-  }, [activeTab, aiImgReady, aiConfig, insertText]);
+  }, [imgPromptText, aiConfig, insertText]);
 
   /** 判断拖入路径是当文本打开，还是作为媒体/附件插入引用 */
   const isTextFilePath = (p: string): boolean => {
@@ -1955,7 +1970,7 @@ export default function App() {
     { ico: "📋", txt: "列表", title: "显示/隐藏文件列表 (Ctrl+Shift+B)", on: layout.filelistOpen, onClick: () => patchLayout({ filelistOpen: !layout.filelistOpen }) },
     { ico: "📊", txt: "表格", title: "在光标处插入 Markdown 表格", disabled: !activeTab, onClick: () => setTableOpen(true) },
     { ico: "🖼️", txt: "媒体", title: "插入媒体/附件：选择图片、音频、视频或任意文件，按设置的归档策略插入引用（右键编辑区也可插入）", disabled: !activeTab, onClick: () => void pickAndInsertMedia() },
-    { ico: imgGenerating ? "⏳" : "🎨", txt: imgGenerating ? "生图…" : "生图", title: "AI 生图：输入描述生成图片并在光标处插入引用（需在 AI 设置中填好生图模型）", disabled: !activeTab || imgGenerating, onClick: () => void handleImageGen() },
+    { ico: imgGenerating ? "⏳" : "🎨", txt: imgGenerating ? "生图…" : "生图", title: "AI 生图：弹窗输入提示词，生成后插入到光标处（需在 AI 设置中填好生图模型）", disabled: !activeTab || imgGenerating, onClick: () => void handleImageGen() },
     { ico: "👁️", txt: "预览", title: "Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览", disabled: !activeTab, on: previewOpen, onClick: () => setPreviewOpen(true) },
     { ico: "🖨️", txt: "打印", title: "打印 / 导出 PDF（按当前缩放字号；打印对话框里选「另存为 PDF」）", disabled: !activeTab, cls: "menubar-secondary", onClick: doPrint },
     { ico: "🖍️", txt: "标注", title: "标注导航：当前文件所有划线/高亮/备注列表，点击跳转", disabled: !activeTab, on: annoOpen, onClick: () => setAnnoOpen((v) => !v) },
@@ -2439,6 +2454,51 @@ export default function App() {
           onExportHtml={exportPreviewHtml}
           onClose={() => setPreviewOpen(false)}
         />
+      )}
+
+      {/* AI 生图对话框（v0.24：替代 window.prompt——WebView 不支持） */}
+      {imgPromptOpen && (
+        <div className="modal-mask" onClick={() => !imgGenerating && setImgPromptOpen(false)}>
+          <div className="modal img-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>🎨 AI 生图</h2>
+              <button className="icon-btn" onClick={() => setImgPromptOpen(false)} disabled={imgGenerating} title="关闭">
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="field">
+                <span>图片描述（提示词）</span>
+                <textarea
+                  rows={4}
+                  autoFocus
+                  value={imgPromptText}
+                  placeholder="例如：赛博朋克风格的城市夜景，霓虹灯，雨夜，电影感构图"
+                  onChange={(e) => setImgPromptText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      void doImageGen();
+                    }
+                  }}
+                />
+              </label>
+              <p className="hint">
+                生图模型：<b>{resolveConfig(aiConfig).imgModel || "未配置"}</b>（在「AI 设置」中修改）；Ctrl+Enter 直接生成
+              </p>
+              {imgErr && <p className="msg err" style={{ whiteSpace: "pre-wrap" }}>{imgErr}</p>}
+            </div>
+            <div className="modal-foot">
+              <div className="grow" />
+              <button onClick={() => setImgPromptOpen(false)} disabled={imgGenerating}>
+                取消
+              </button>
+              <button className="primary" onClick={() => void doImageGen()} disabled={imgGenerating || !imgPromptText.trim()}>
+                {imgGenerating ? "生成中…（最长 2 分钟）" : "🎨 生成并插入"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* AI 设置弹窗 */}
