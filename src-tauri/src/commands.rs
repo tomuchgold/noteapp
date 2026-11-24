@@ -254,6 +254,82 @@ pub fn copy_media_file(src: String, doc_path: String) -> Result<String, String> 
     Ok(format!("media/{}", dest.file_name().unwrap().to_string_lossy()))
 }
 
+/// 把 base64 编码的图片解码后保存到文档旁 media/ 目录（AI 生图落盘，v0.25）。
+/// 返回相对引用 media/xxx.png
+#[tauri::command]
+pub fn save_image_b64(doc_path: String, b64: String, ext: String) -> Result<String, String> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let safe_ext = {
+        let e = ext.to_lowercase();
+        let e = e.strip_prefix('.').unwrap_or(&e);
+        if e.is_empty() {
+            "png".to_string()
+        } else if ["png", "jpg", "jpeg", "webp", "gif"].contains(&e) {
+            e.to_string()
+        } else {
+            return Err(format!("不支持的图片扩展名：{}", e));
+        }
+    };
+    let doc_dir = Path::new(&doc_path)
+        .parent()
+        .ok_or_else(|| "无法确定文档目录".to_string())?;
+    let media_dir = doc_dir.join("media");
+    fs::create_dir_all(&media_dir).map_err(|e| format!("创建 media 目录失败：{}", e))?;
+
+    // 防重名：ai-<unix毫秒>-<序号>.<ext>
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let mut dest = media_dir.join(format!("ai-{}.{}", ts, safe_ext));
+    let mut seq = 1;
+    while dest.exists() {
+        dest = media_dir.join(format!("ai-{}-{}.{}", ts, seq, safe_ext));
+        seq += 1;
+    }
+    let bytes = decode_b64(&b64).map_err(|e| format!("base64 解码失败：{}", e))?;
+    fs::write(&dest, &bytes).map_err(|e| format!("写入图片失败：{}", e))?;
+    Ok(format!("media/{}", dest.file_name().unwrap().to_string_lossy()))
+}
+
+/// 宽容的 base64 解码（容忍 data URL、空白与 URL-safe 变体）
+fn decode_b64(s: &str) -> Result<Vec<u8>, String> {
+    const STD: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let cleaned: String = s
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let cleaned = cleaned
+        .trim_start_matches("data:")
+        .split(',')
+        .last()
+        .unwrap_or("")
+        .replace('-', "+")
+        .replace('_', "/");
+    let mut out = Vec::with_capacity(cleaned.len() / 4 * 3);
+    let mut buf: u32 = 0;
+    let mut bits = 0u32;
+    for ch in cleaned.bytes() {
+        if ch == b'=' {
+            break;
+        }
+        let v = STD
+            .iter()
+            .position(|&c| c == ch)
+            .ok_or_else(|| format!("非法 base64 字符：{}", ch as char))? as u32;
+        buf = (buf << 6) | v;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push(((buf >> bits) & 0xFF) as u8);
+        }
+    }
+    if out.is_empty() {
+        return Err("解码结果为空".to_string());
+    }
+    Ok(out)
+}
+
 /// 跨文件夹查找的命中行
 #[derive(serde::Serialize)]
 pub struct SearchHit {

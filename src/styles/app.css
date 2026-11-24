@@ -3003,3 +3003,18 @@ kbd {
   resize: vertical;
   font-family: inherit;
 }
+.model-chip .model-img {
+  background: none;
+  border: none;
+  border-left: 1px solid var(--ui-border);
+  color: var(--ui-dim, #999);
+  padding: 3px 7px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.model-chip .model-img:hover {
+  background: var(--ui-hover, #2a2a2a);
+}
+.model-chip .model-img.on {
+  color: #22c55e;
+}

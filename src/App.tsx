@@ -75,6 +75,7 @@ import {
   getRecent,
   openDirectoryDialog,
   copyMediaFile,
+  saveImageB64,
   searchInFolder,
   pathIsDir,
   makeDir,
@@ -926,7 +927,8 @@ export default function App() {
       return;
     }
     setImgErr(null);
-    setImgPromptText("");
+    // v0.25：提示词优先用当前选中的文字
+    setImgPromptText(selectionTextRef.current?.trim() ?? "");
     setImgPromptOpen(true);
   }, [activeTab, aiImgReady]);
 
@@ -942,14 +944,35 @@ export default function App() {
     try {
       const urls = await runImageGen(aiConfig, desc, 1);
       if (urls.length === 0) throw new Error("API 未返回图片");
+      let url = urls[0];
+      // v0.25：base64/dataURL 不再直接塞进文档——解码落盘到文档旁 media/，插入相对引用
+      if (url.startsWith("data:")) {
+        if (!activeTab?.path) {
+          setImgGenerating(false);
+          setImgErr("生成的图片需要保存到文档旁 media/ 目录，但当前文档尚未保存到磁盘。\n请先用 Ctrl+S 保存文档，再重新生成。");
+          return;
+        }
+        if (activeTab.readOnly) {
+          setImgGenerating(false);
+          setImgErr("大文件模式为只读，无法保存生成的图片。");
+          return;
+        }
+        const m = /^data:image\/([a-z0-9+]+);base64,(.+)$/i.exec(url);
+        const ext = m?.[1]?.replace("jpeg", "jpg") ?? "png";
+        const b64 = m?.[2] ?? url;
+        const rel = await saveImageB64(activeTab.path, b64, ext);
+        // media/ 目录可能新建 → 刷新文件夹树
+        if (folderRoot && isUnderFolderRoot(activeTab.path, folderRoot)) setFolderReloadKey((k) => k + 1);
+        url = rel;
+      }
       setImgPromptOpen(false);
-      insertText(`\n![${desc.slice(0, 40)}](${urls[0]})\n`);
+      insertText(`\n![${desc.slice(0, 40)}](${url})\n`);
     } catch (e) {
       setImgErr(friendlyAiError(e, resolveConfig(aiConfig).imgModel));
     } finally {
       setImgGenerating(false);
     }
-  }, [imgPromptText, aiConfig, insertText]);
+  }, [imgPromptText, aiConfig, insertText, activeTab, folderRoot, isUnderFolderRoot]);
 
   /** 判断拖入路径是当文本打开，还是作为媒体/附件插入引用 */
   const isTextFilePath = (p: string): boolean => {

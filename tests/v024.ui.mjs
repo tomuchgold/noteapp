@@ -84,7 +84,7 @@ check("AI 设置打开", await dlg.isVisible().catch(() => false));
 check("模型列表区块出现", (await page.locator(".modal.ai-settings .model-list").count()) === 1);
 const presetChips = await page.locator(".modal.ai-settings .model-chip .model-pick").allTextContents();
 check("预设模型以 chip 列出（deepseek-chat 等）", presetChips.some((t) => t.includes("deepseek-chat")), JSON.stringify(presetChips));
-check("当前模型有 ✓ 标记", presetChips.some((t) => t.trim().startsWith("✓")), JSON.stringify(presetChips));
+check("当前模型有 💬 标记", presetChips.some((t) => t.trim().startsWith("💬")), JSON.stringify(presetChips));
 
 // 点选 chip → 输入框更新
 await page.locator(".modal.ai-settings .model-chip .model-pick", { hasText: "deepseek-reasoner" }).click();

@@ -170,16 +170,25 @@ export default function AiSettingsDialog({ config, onSave, onClose }: Props) {
             </datalist>
           </label>
 
-          {/* v0.24：可视化模型列表——点选即用，来源为「拉取 + 预设 + 手动添加」 */}
+          {/* v0.25：可视化模型列表 + 角色分工——点选为对话模型，🖼 设为生图模型 */}
           <div className="field">
-            <span>模型列表（点击选用；{cfg.fetchedModels?.length ? "含拉取结果" : "预设模型，可点下方「拉取模型列表」刷新"}）</span>
+            <span>模型列表（💬 当前对话模型：{currentModel || "未选择"} ｜ 🖼 当前生图模型：{cfg.imgModel || "未选择"}）</span>
             <div className="model-list">
               {modelList.length === 0 && <p className="hint">暂无模型，点「拉取模型列表」或手动添加。</p>}
               {modelList.map((m) => (
                 <div key={m} className={`model-chip ${m === currentModel ? "on" : ""}`}>
-                  <button type="button" className="model-pick" title={`选用 ${m}`} onClick={() => patchCfg({ model: m })}>
-                    {m === currentModel ? "✓ " : ""}
+                  <button type="button" className="model-pick" title={`设为对话/推理模型：${m}`} onClick={() => patchCfg({ model: m })}>
+                    {m === currentModel ? "💬 " : ""}
+                    {m === cfg.imgModel ? "🖼 " : ""}
                     {m}
+                  </button>
+                  <button
+                    type="button"
+                    className={`model-img ${m === cfg.imgModel ? "on" : ""}`}
+                    title={`设为生图模型：${m}`}
+                    onClick={() => patchCfg({ imgModel: m === cfg.imgModel ? "" : m })}
+                  >
+                    🖼
                   </button>
                   {(cfg.extraModels ?? []).includes(m) && (
                     <button type="button" className="model-del" title="移除此自定义模型" onClick={() => removeExtraModel(m)}>
@@ -205,6 +214,7 @@ export default function AiSettingsDialog({ config, onSave, onClose }: Props) {
                 ＋ 添加并选用
               </button>
             </div>
+            <p className="hint">💬 点击模型名 = 对话/推理/润色用它；🖼 = AI 生图用它。同一家拉到的模型可分别指定；换厂商后各自独立保存。</p>
           </div>
 
           <label className="field">

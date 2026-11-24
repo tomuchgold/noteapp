@@ -86,6 +86,7 @@ pub fn run() {
             commands::file_info,
             commands::read_file_chunk,
             commands::copy_media_file,
+            commands::save_image_b64,
             commands::search_in_folder,
             commands::path_is_dir,
             commands::make_dir,

@@ -1,6 +1,6 @@
 [package]
 name = "notepp"
-version = "0.24.0"
+version = "0.25.0"
 description = "NotePP - 轻量跨平台文本/代码编辑器"
 authors = ["NotePP Team"]
 edition = "2021"

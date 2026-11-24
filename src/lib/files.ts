@@ -133,6 +133,14 @@ export function copyMediaFile(src: string, docPath: string): Promise<string> {
   return invoke("copy_media_file", { src, docPath });
 }
 
+/**
+ * AI 生图落盘：把 base64 图片解码后存到文档同目录 media/ 下（v0.25），
+ * 返回相对引用 media/ai-xxx.ext
+ */
+export function saveImageB64(docPath: string, b64: string, ext: string): Promise<string> {
+  return invoke("save_image_b64", { docPath, b64, ext });
+}
+
 /** 跨文件夹查找的单条命中（Rust search_in_folder 返回） */
 export interface FolderSearchHit {
   path: string;
