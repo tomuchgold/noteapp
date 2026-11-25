@@ -49,6 +49,44 @@ fn detect_eol(bytes: &[u8]) -> String {
     }
 }
 
+/// v0.30：读取任意本地文件为 base64 字符串（导出 HTML 内嵌媒体用）。
+/// 上限 64MB，避免误读巨型文件。
+#[tauri::command]
+pub fn read_file_base64(path: String) -> Result<String, String> {
+    use std::io::Read;
+    let p = Path::new(&path);
+    if !p.is_file() {
+        return Err(format!("文件不存在：{}", path));
+    }
+    let meta = fs::metadata(p).map_err(|e| format!("读取元数据失败：{}", e))?;
+    if meta.len() > 64 * 1024 * 1024 {
+        return Err(format!("文件过大（{}MB > 64MB），不内嵌导出", meta.len() / 1024 / 1024));
+    }
+    let mut buf: Vec<u8> = Vec::with_capacity(meta.len() as usize);
+    fs::File::open(p)
+        .map_err(|e| format!("打开失败：{}", e))?
+        .read_to_end(&mut buf)
+        .map_err(|e| format!("读取失败：{}", e))?;
+    Ok(b64_encode(&buf))
+}
+
+/// 标准 base64 编码（带 padding）
+fn b64_encode(data: &[u8]) -> String {
+    const TBL: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(TBL[(n >> 18) as usize & 63] as char);
+        out.push(TBL[(n >> 12) as usize & 63] as char);
+        out.push(if chunk.len() > 1 { TBL[(n >> 6) as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 2 { TBL[n as usize & 63] as char } else { '=' });
+    }
+    out
+}
+
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<ReadResult, String> {
     let p = Path::new(&path);
@@ -57,7 +95,6 @@ pub fn read_text_file(path: String) -> Result<ReadResult, String> {
     }
     let bytes = fs::read(p).map_err(|e| format!("读取失败：{}", e))?;
     let size = bytes.len() as u64;
-
     // 1. BOM 检测
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         let text = String::from_utf8_lossy(&bytes[3..]).into_owned();

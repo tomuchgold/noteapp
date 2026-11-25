@@ -19,6 +19,8 @@ export interface FileTab {
   large?: { total: number; loaded: number };
   /** 是否只读 */
   readOnly?: boolean;
+  /** v0.30：媒体查看标签（图片/音频/视频，只读渲染，不进编辑器） */
+  mediaTab?: boolean;
 }
 
 /** read_file 命令返回 */

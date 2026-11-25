@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.29.0</title>
+<title>NotePP 功能手册 — v0.30.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.29.0</span>
+    <span class="ver-badge">v0.30.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.29.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.30.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.29.0</b></span>
+        <span>当前版本 <b>v0.30.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -469,7 +469,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">👁️</span>渲染预览与导出带样式 HTML</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">所见即所得的渲染预览；txt 等文本文件也按 Markdown 渲染（v0.27）；支持导出保留样式的 HTML。<b>图片 / 音频 / 视频的相对路径引用（如 <code>media/xxx.png</code>、<code>../xxx.png</code> 上级目录）按文档所在目录解析</b>，编辑器内渲染、预览、导出 HTML、打印 PDF 中都能正常显示（v0.27 修复同目录裂图；v0.29 修复上级目录 <code>../</code> 引用裂图）。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><b>v0.28 起预览贴边显示在右侧</b>，编辑时实时刷新，可与编辑器并排对照；面板右上可切换<b>全屏</b>，<b>打印 / 导出 PDF 按钮已归入预览面板</b>（菜单栏不再单独有打印项）。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><b>v0.28 起预览贴边显示在右侧，编辑时实时刷新；v0.30 起预览为真分屏</b>——打开预览时编辑区自动让位，两侧同时可见互不遮挡（预览全屏时除外）；面板右上可切换<b>全屏</b>，<b>打印 / 导出 PDF 按钮已归入预览面板</b>（菜单栏不再单独有打印项）。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「预览」→ 导出带样式 HTML</div>
       </div>
     </section>
@@ -641,7 +641,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.29.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.30.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 

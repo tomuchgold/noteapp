@@ -141,6 +141,11 @@ export function saveImageB64(docPath: string, b64: string, ext: string): Promise
   return invoke("save_image_b64", { docPath, b64, ext });
 }
 
+/** v0.30：读取任意文件为 base64（导出 HTML 内嵌媒体用）；浏览器/测试环境抛错 */
+export function readFileBase64(path: string): Promise<string> {
+  return invoke<string>("read_file_base64", { path });
+}
+
 /** 跨文件夹查找的单条命中（Rust search_in_folder 返回） */
 export interface FolderSearchHit {
   path: string;

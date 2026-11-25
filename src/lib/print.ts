@@ -1,17 +1,18 @@
 import { exportHtmlPayload } from "../components/PreviewDialog";
+import { embedMediaInHtml } from "./embedMedia";
 
 /**
- * 打印 / 导出 PDF：按当前缩放字号生成带样式文档，
+ * 打印 / 导出 PDF：按当前缩放字号生成带样式文档（v0.30：本地媒体内嵌 base64），
  * 在隐藏 iframe 中调起系统打印对话框（Windows/macOS 打印机里选「另存为 PDF」即可）。
  */
-export function printDocument(
+export async function printDocument(
   source: string,
   title: string,
   fontSize: number,
   isMarkdown: boolean,
   mediaDir?: string | null
-): void {
-  const doc = exportHtmlPayload(source, title, fontSize, isMarkdown, mediaDir);
+): Promise<void> {
+  const doc = await embedMediaInHtml(exportHtmlPayload(source, title, fontSize, isMarkdown, mediaDir));
   const old = document.getElementById("notepp-print-frame");
   if (old) old.remove();
 

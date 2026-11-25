@@ -17,6 +17,15 @@ function extOf(ref: string): string {
   return (name.includes(".") ? name.split(".").pop()! : "").toLowerCase();
 }
 
+/** v0.30：按扩展名判断媒体类型（文件夹树点击媒体 → 新标签打开查看用） */
+export function mediaKindOf(ref: string): "img" | "audio" | "video" | null {
+  const ext = extOf(ref);
+  if (IMG_EXT.has(ext)) return "img";
+  if (AUDIO_EXT.has(ext)) return "audio";
+  if (VIDEO_EXT.has(ext)) return "video";
+  return null;
+}
+
 /** 把引用路径解析为可加载的 src（asset 协议 / 远程 URL / 原样兜底） */
 export function resolveMediaSrc(ref: string, docDir: string | null): string {
   if (/^(https?|data|blob|asset):/i.test(ref)) return ref;

@@ -34,6 +34,8 @@ import {
 } from "./lib/keymap";
 import { loadTtsConfig, speak, stopSpeaking } from "./lib/tts";
 import { printDocument } from "./lib/print";
+import { mediaKindOf } from "./lib/mediaView";
+import MediaViewer from "./components/MediaViewer";
 import {
   applyCase,
   DEFAULT_OPTIONS,
@@ -855,6 +857,8 @@ export default function App() {
   // ---------- 插入表格 / Markdown 预览 ----------
   const [tableOpen, setTableOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  /** v0.30：预览全屏状态（全屏时编辑区不让位） */
+  const [previewFull, setPreviewFull] = useState(false);
 
   const insertText = useCallback((text: string) => {
     actionCount.current += 1;
@@ -908,7 +912,7 @@ export default function App() {
   /** 打印 / 导出 PDF（打印机选「另存为 PDF」） */
   const doPrint = useCallback(() => {
     if (!activeTab) return;
-    printDocument(
+    void printDocument(
       activeTab.content,
       activeTab.name.replace(/\.[^.]+$/, ""),
       effectiveFontSize(editorSettings),
@@ -1109,11 +1113,30 @@ export default function App() {
 
 
 
-  /** 打开单个路径（去重：已打开则激活） */
+  /** 打开单个路径（去重：已打开则激活；媒体文件以只读查看标签打开 v0.30） */
   const openPath = useCallback(async (path: string) => {
     const existing = tabs.find((t) => t.path === path);
     if (existing) {
       setActiveId(existing.id);
+      return;
+    }
+    // v0.30：图片/音频/视频 → 媒体查看标签（引用渲染，不动原文件）
+    const kind = mediaKindOf(path);
+    if (kind) {
+      const tab: FileTab = {
+        id: newId(),
+        path,
+        name: baseName(path),
+        content: "",
+        dirty: false,
+        encoding: "UTF-8",
+        bom: false,
+        eol: "LF",
+        readOnly: true,
+        mediaTab: true,
+      };
+      setTabs((ts) => [...ts, tab]);
+      setActiveId(tab.id);
       return;
     }
     try {
@@ -2289,7 +2312,7 @@ export default function App() {
 
         <div className="editor-row">
         <div
-          className="editor-area"
+          className={"editor-area" + (previewOpen && !previewFull ? " preview-open" : "")}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => e.preventDefault()}
         >
@@ -2313,6 +2336,10 @@ export default function App() {
           </div>
         ) : (
           activeTab && (
+            activeTab.mediaTab ? (
+              /* v0.30：媒体查看标签（图片/音频/视频，引用渲染不动原文件） */
+              <MediaViewer path={activeTab.path} name={activeTab.name} />
+            ) : (
             <>
               {activeTab.large && (
                 <div className="large-banner">
@@ -2361,6 +2388,7 @@ export default function App() {
               onFindInNote={openFindWith}
             />
             </>
+            )
           )
         )}
       </div>
@@ -2604,7 +2632,7 @@ export default function App() {
         <InsertTableDialog onInsert={insertText} onClose={() => setTableOpen(false)} />
       )}
 
-      {/* Markdown 预览 */}
+      {/* Markdown 预览（v0.30：分屏让位，不遮盖编辑区） */}
       {previewOpen && activeTab && (
         <PreviewDialog
           title={activeTab.name}
@@ -2614,6 +2642,7 @@ export default function App() {
           onExportHtml={exportPreviewHtml}
           onPrint={doPrint}
           onClose={() => setPreviewOpen(false)}
+          onFullChange={setPreviewFull}
         />
       )}
 

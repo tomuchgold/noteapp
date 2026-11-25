@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { markdownToHtml, enhanceMarkdownDom, EXPORT_EXTRAS_HEAD } from "../lib/markdown";
+import { embedMediaInHtml } from "../lib/embedMedia";
 
 interface Props {
   /** 文档名（导出 HTML 默认文件名） */
@@ -15,6 +16,8 @@ interface Props {
   /** 打印 / 导出 PDF（v0.28：打印归入预览面板） */
   onPrint?: () => void;
   onClose: () => void;
+  /** v0.30：全屏状态回传（编辑区让位用） */
+  onFullChange?: (full: boolean) => void;
 }
 
 /** 导出用的整页 HTML 模板（带样式，可直接浏览器打开 / 打印为 PDF） */
@@ -69,9 +72,19 @@ export default function PreviewDialog({
   onExportHtml,
   onPrint,
   onClose,
+  /** v0.30：全屏状态回传给 App（编辑区据此让位） */
+  onFullChange,
 }: Props) {
   const isMarkdown = /\.(md|markdown|txt)$/i.test(title);
   const [full, setFull] = useState(false);
+  useEffect(() => {
+    onFullChange?.(full);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [full]);
+  const close = () => {
+    onFullChange?.(false);
+    onClose();
+  };
   const html = useMemo(() => {
     try {
       if (isMarkdown) return markdownToHtml(source, { mediaDir });
@@ -90,8 +103,9 @@ export default function PreviewDialog({
     if (bodyRef.current) void enhanceMarkdownDom(bodyRef.current);
   }, [html]);
 
-  const exportHtml = () => {
-    const doc = exportHtmlPayload(source, title, fontSize, isMarkdown, mediaDir);
+  // v0.30：导出前把本地媒体内嵌为 base64，得到所见即所得的自包含 HTML
+  const exportHtml = async () => {
+    const doc = await embedMediaInHtml(exportHtmlPayload(source, title, fontSize, isMarkdown, mediaDir));
     if (onExportHtml) {
       onExportHtml(doc);
       return;
@@ -117,10 +131,10 @@ export default function PreviewDialog({
               🖨️ 打印
             </button>
           )}
-          <button onClick={exportHtml} title="导出带样式的 HTML，可直接浏览器打印为 PDF">
+          <button onClick={() => void exportHtml()} title="导出所见即所得的自包含 HTML（媒体已内嵌），可直接浏览器打开/打印为 PDF">
             导出 HTML
           </button>
-          <button className="primary" onClick={onClose}>关闭</button>
+          <button className="primary" onClick={close}>关闭</button>
         </div>
       </div>
       <div className="markdown-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: html }} />
