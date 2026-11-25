@@ -135,7 +135,7 @@ await page.locator(".img-pref-chip", { hasText: "透明物品" }).click();
 await page.waitForTimeout(150);
 const pt = await page.locator(".modal.img-dialog textarea").inputValue();
 check("点击 chip 追加透明背景提示词", pt.includes("纯物品，透明背景"), `v="${pt}"`);
-await page.locator(".modal.img-dialog .icon-btn").click();
+await page.locator(".modal.img-dialog .icon-btn[title=\"关闭\"]").click();
 
 console.log(`\n===== v026: ${results.filter((r) => r.ok).length}/${results.length} PASS =====`);
 await browser.close();

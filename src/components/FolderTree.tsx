@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listDir, type DirEntryInfo } from "../lib/files";
 import { resolveMediaSrc } from "../lib/mediaView";
+import { useClampMenu } from "../lib/clampMenu";
 
 const TREE_IMG_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
 const TREE_MEDIA_EXT = new Set([
@@ -85,6 +86,7 @@ export default function FolderTree({
   const [children, setChildren] = useState<Record<string, DirEntryInfo[]>>({});
   const [loading, setLoading] = useState(false);
   const [menu, setMenu] = useState<CtxMenu | null>(null);
+  const clampRef = useClampMenu([menu]); // v0.29：菜单始终完整出现在视口内
   /** 悬停小预览（v0.28：图片显示缩略图，音视频显示图标提示） */
   const [hover, setHover] = useState<{ x: number; y: number; path: string; img: boolean } | null>(null);
   const hoverTimer = useRef<number | null>(null);
@@ -326,7 +328,7 @@ export default function FolderTree({
       {root && renderNodes(entries, 0)}
 
       {menu && (
-        <div className="context-menu folder-context-menu" style={{ display: "block", left: menu.x, top: menu.y }}>
+        <div ref={clampRef} className="context-menu folder-context-menu" style={{ display: "block", left: menu.x, top: menu.y }}>
           {menu.target ? renderItemMenu(menu.target) : renderRootMenu()}
         </div>
       )}

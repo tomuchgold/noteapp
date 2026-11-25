@@ -21,6 +21,7 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { oneDarkHighlightStyle } from "@codemirror/theme-one-dark";
 import { detectLanguage } from "../lib/lang";
 import { AI_ACTIONS, type AiAction } from "../lib/ai";
+import { useClampMenu } from "../lib/clampMenu";
 import type { EditorSettings } from "../lib/settings";
 import { effectiveFontSize } from "../lib/settings";
 import { findTheme, type ThemeDef } from "../lib/themes";
@@ -372,6 +373,9 @@ export default function Editor({
   snippetsRef.current = snippets;
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; text: string; from?: number; to?: number } | null>(null);
   const [noteInput, setNoteInput] = useState<{ text: string; from: number; to: number; x: number; y: number } | null>(null);
+  // v0.29：右键菜单/标注浮层始终完整出现在视口内
+  const aiMenuRef = useClampMenu([aiMenu]);
+  const noteInputRef = useClampMenu([noteInput]);
   const switchingRef = useRef(false);
 
   onChangeRef.current = onChange;
@@ -898,6 +902,7 @@ export default function Editor({
     >
       {aiMenu && (
         <div
+          ref={aiMenuRef}
           className="ai-menu"
           style={{ left: aiMenu.x, top: aiMenu.y }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -1025,8 +1030,9 @@ export default function Editor({
 
       {noteInput && (
         <div
+          ref={noteInputRef}
           className="note-input-pop"
-          style={{ left: noteInput.x, top: Math.min(noteInput.y, window.innerHeight - 220) }}
+          style={{ left: noteInput.x, top: noteInput.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="ai-menu-head">标注信息</div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { relTime, type Category, type LibraryFile } from "../lib/library";
+import { useClampMenu } from "../lib/clampMenu";
 
 interface Props {
   title: string;
@@ -38,6 +39,7 @@ export default function FileList({
   onClose,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
+  const clampRef = useClampMenu([menu]); // v0.29：菜单始终完整出现在视口内
 
   useEffect(() => {
     if (!menu) return;
@@ -126,8 +128,9 @@ export default function FileList({
 
       {menu && menuFile && (
         <div
+          ref={clampRef}
           className="ctx-menu"
-          style={{ left: Math.min(menu.x, window.innerWidth - 190), top: menu.y }}
+          style={{ left: menu.x, top: menu.y }}
           onClick={(e) => e.stopPropagation()}
         >
           <button

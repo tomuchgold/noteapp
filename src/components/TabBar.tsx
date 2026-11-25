@@ -35,8 +35,13 @@ export default function TabBar({ tabs, activeId, onSelect, onClose, onNewTab }: 
             const menu = document.getElementById("tab-context-menu");
             if (menu) {
               menu.style.display = "block";
+              // v0.29：视口钳制——菜单靠右/靠下时不超出窗口
               menu.style.left = `${e.clientX}px`;
               menu.style.top = `${e.clientY}px`;
+              const w = menu.offsetWidth;
+              const h = menu.offsetHeight;
+              menu.style.left = `${Math.max(8, Math.min(e.clientX, window.innerWidth - w - 8))}px`;
+              menu.style.top = `${Math.max(8, Math.min(e.clientY, window.innerHeight - h - 8))}px`;
               menu.dataset.tabId = tab.id;
             }
           }}

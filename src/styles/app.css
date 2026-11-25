@@ -3133,6 +3133,103 @@ kbd {
 .modal.img-dialog {
   width: min(520px, 92vw);
 }
+.modal.img-dialog .head-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+/* v0.29：生图对话框全屏 */
+.modal.img-dialog.full {
+  width: min(96vw, 1400px);
+  height: min(92vh, 900px);
+  display: flex;
+  flex-direction: column;
+}
+.modal.img-dialog.full .modal-body {
+  flex: 1;
+  overflow: auto;
+}
+.modal.img-dialog.full textarea {
+  min-height: 38vh;
+}
+/* v0.29：生图偏好编辑 */
+.img-prefs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.img-prefs-edit {
+  background: none;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  color: var(--ui-fg-dim, #999);
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.img-prefs-edit:hover {
+  color: var(--ui-fg);
+  background: var(--ui-hover);
+}
+.img-prefs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.img-prefs-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.img-pref-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.img-pref-row .pref-emoji {
+  width: 44px;
+  text-align: center;
+}
+.img-pref-row .pref-label {
+  width: 110px;
+}
+.img-pref-row .pref-add {
+  flex: 1;
+}
+.img-pref-row input {
+  background: var(--ui-panel-2, #1b1e23);
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  color: var(--ui-fg);
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.img-pref-row .pref-del {
+  background: none;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  color: var(--ui-danger, #e5697e);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.img-pref-row .pref-del:hover {
+  background: rgba(229, 105, 126, 0.12);
+}
+.pref-add-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--ui-border);
+  border-radius: 5px;
+  color: var(--ui-fg-dim, #999);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.pref-add-btn:hover {
+  color: var(--ui-fg);
+  background: var(--ui-hover);
+}
 .modal.img-dialog textarea {
   resize: vertical;
   font-family: inherit;

@@ -24,6 +24,9 @@ export function resolveMediaSrc(ref: string, docDir: string | null): string {
   if (!/^[\\/]/.test(p) && !/^[A-Za-z]:/.test(p)) {
     p = docDir ? `${docDir.replace(/[\\/]+$/, "")}/${p}` : p;
   }
+  // v0.29：归一化 .. / . 段（如 ../pic.png、media/sub/../a.jpg）——
+  // WebView asset 协议不解析 ..，带着 .. 会加载失败（用户实测相对上级引用裂图）
+  p = normalizePath(p);
   try {
     // Tauri v2：转发给 internals；浏览器/测试环境没有就退回原路径
     const conv = (window as unknown as { __TAURI_INTERNALS__?: { convertFileSrc?: (p: string) => string } }).__TAURI_INTERNALS__?.convertFileSrc;
@@ -32,6 +35,32 @@ export function resolveMediaSrc(ref: string, docDir: string | null): string {
     /* ignore */
   }
   return p;
+}
+
+/**
+ * 路径归一化：解析 . / .. 段。支持 POSIX 与 Windows（盘符 + 反斜杠）。
+ * 绝对路径的 .. 超出根时截断在根；相对路径保留开头的 ..。
+ */
+export function normalizePath(p: string): string {
+  if (!p) return p;
+  const isWin = /^[A-Za-z]:/.test(p) || p.includes("\\");
+  const drive = isWin && /^[A-Za-z]:/.test(p) ? p.slice(0, 2) : "";
+  const body = drive ? p.slice(2) : p;
+  const absolute = /^[\\/]/.test(body);
+  const segs = body.split(/[\\/]+/).filter((s) => s.length > 0);
+  const out: string[] = [];
+  for (const seg of segs) {
+    if (seg === ".") continue;
+    if (seg === "..") {
+      if (out.length > 0 && out[out.length - 1] !== "..") out.pop();
+      else if (!absolute) out.push("..");
+      // 绝对路径 .. 超出根：截断（丢弃）
+      continue;
+    }
+    out.push(seg);
+  }
+  const sep = isWin ? "\\" : "/";
+  return drive + (absolute ? sep : "") + out.join(sep);
 }
 
 class ImgWidget extends WidgetType {

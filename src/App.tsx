@@ -139,6 +139,33 @@ function baseName(path: string): string {
 const ENCODINGS = ["UTF-8", "GBK"];
 const SESSION_KEY = "notepp.session";
 
+/** v0.29：生图偏好（可编辑），持久化到 localStorage */
+type ImgPref = { emoji: string; label: string; add: string };
+const IMG_PREFS_KEY = "notepp.img-prefs";
+const DEFAULT_IMG_PREFS: ImgPref[] = [
+  { emoji: "🧊", label: "透明物品", add: "纯物品，透明背景，无环境" },
+  { emoji: "🧻", label: "白底产品", add: "纯物品，白底产品图，无阴影" },
+  { emoji: "🎯", label: "极简居中", add: "极简风格，居中构图" },
+  { emoji: "🔍", label: "高清细节", add: "高清细节，4k" },
+];
+function loadImgPrefs(): ImgPref[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(IMG_PREFS_KEY) ?? "null");
+    if (Array.isArray(arr) && arr.every((p) => p && typeof p.add === "string" && typeof p.label === "string"))
+      return arr as ImgPref[];
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_IMG_PREFS;
+}
+function saveImgPrefs(prefs: ImgPref[]) {
+  try {
+    localStorage.setItem(IMG_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 字节 → 人类可读（大文件模式横幅用） */
 function fmtMB(bytes: number) {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
@@ -975,6 +1002,11 @@ export default function App() {
   const [imgGenerating, setImgGenerating] = useState(false);
   const [imgPromptOpen, setImgPromptOpen] = useState(false);
   const [imgPromptText, setImgPromptText] = useState("");
+  // v0.29：生图偏好可编辑（增/删/改），持久化；对话框支持全屏
+  const [imgPrefs, setImgPrefs] = useState<ImgPref[]>(() => loadImgPrefs());
+  const [imgPrefsEdit, setImgPrefsEdit] = useState(false);
+  const [imgFull, setImgFull] = useState(false);
+  useEffect(() => saveImgPrefs(imgPrefs), [imgPrefs]);
   const [imgDone, setImgDone] = useState<string | null>(null);
   const handleImageGen = useCallback(async () => {
     if (!activeTab) return;
@@ -2585,21 +2617,30 @@ export default function App() {
         />
       )}
 
-      {/* AI 生图对话框（v0.27：生成在后台运行，可随时关闭继续编辑，状态栏显示进度） */}
+      {/* AI 生图对话框（v0.27：后台生成；v0.29：UI 重构 + 全屏 + 偏好可编辑） */}
       {imgPromptOpen && (
         <div className="modal-mask" onClick={() => setImgPromptOpen(false)}>
-          <div className="modal img-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal img-dialog${imgFull ? " full" : ""}`} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2>🎨 AI 生图</h2>
-              <button className="icon-btn" onClick={() => setImgPromptOpen(false)} title="关闭">
-                ×
-              </button>
+              <div className="head-actions">
+                <button
+                  className="icon-btn"
+                  onClick={() => setImgFull((v) => !v)}
+                  title={imgFull ? "退出全屏" : "全屏编辑"}
+                >
+                  {imgFull ? "⧉" : "⛶"}
+                </button>
+                <button className="icon-btn" onClick={() => setImgPromptOpen(false)} title="关闭">
+                  ×
+                </button>
+              </div>
             </div>
             <div className="modal-body">
               <label className="field">
                 <span>图片描述（提示词）</span>
                 <textarea
-                  rows={4}
+                  rows={imgFull ? 10 : 4}
                   autoFocus
                   value={imgPromptText}
                   placeholder="例如：赛博朋克风格的城市夜景，霓虹灯，雨夜，电影感构图"
@@ -2615,26 +2656,76 @@ export default function App() {
               <p className="hint">
                 生图模型：<b>{resolveConfig(aiConfig).imgModel || "未配置"}</b>（在「AI 设置」中修改）；Ctrl+Enter 直接生成。
                 <br />
-                生成在<b>后台</b>进行：可先关闭本窗口继续编辑/浏览，完成后自动插入光标处，状态栏会显示进度。
+                生成在<b>后台</b>进行：可先关闭本窗口继续编辑/浏览，完成后自动写回触发时的文件与光标位置，状态栏会显示进度。
               </p>
               <div className="img-prefs">
-                <span className="img-prefs-label">生图偏好（点击追加到提示词）：</span>
-                {[
-                  ["纯物品，透明背景，无环境", "🧊 透明物品"],
-                  ["纯物品，白底产品图，无阴影", "🧻 白底产品"],
-                  ["极简风格，居中构图", "🎯 极简居中"],
-                  ["高清细节，4k", "🔍 高清细节"],
-                ].map(([add, label]) => (
+                <div className="img-prefs-head">
+                  <span className="img-prefs-label">生图偏好（点击追加到提示词）</span>
                   <button
-                    key={label}
                     type="button"
-                    className="img-pref-chip"
-                    title={`追加「${add}」`}
-                    onClick={() => setImgPromptText((t) => (t ? `${t.replace(/[，,]\s*$/, "")}，${add}` : add))}
+                    className="img-prefs-edit"
+                    title={imgPrefsEdit ? "完成编辑" : "编辑偏好（可增加 / 删除）"}
+                    onClick={() => setImgPrefsEdit((v) => !v)}
                   >
-                    {label}
+                    {imgPrefsEdit ? "✓ 完成" : "✎ 编辑"}
                   </button>
-                ))}
+                </div>
+                {!imgPrefsEdit ? (
+                  <div className="img-prefs-chips">
+                    {imgPrefs.map((p, i) => (
+                      <button
+                        key={`${p.label}-${i}`}
+                        type="button"
+                        className="img-pref-chip"
+                        title={`追加「${p.add}」`}
+                        onClick={() => setImgPromptText((t) => (t ? `${t.replace(/[，,]\s*$/, "")}，${p.add}` : p.add))}
+                      >
+                        {p.emoji} {p.label}
+                      </button>
+                    ))}
+                    {imgPrefs.length === 0 && <span className="dim" style={{ fontSize: 12 }}>暂无偏好，点「✎ 编辑」添加</span>}
+                  </div>
+                ) : (
+                  <div className="img-prefs-editor">
+                    {imgPrefs.map((p, i) => (
+                      <div key={`edit-${i}`} className="img-pref-row">
+                        <input
+                          className="pref-emoji"
+                          value={p.emoji}
+                          title="图标（emoji）"
+                          onChange={(e) => setImgPrefs((arr) => arr.map((q, j) => (j === i ? { ...q, emoji: e.target.value } : q)))}
+                        />
+                        <input
+                          className="pref-label"
+                          value={p.label}
+                          placeholder="名称"
+                          onChange={(e) => setImgPrefs((arr) => arr.map((q, j) => (j === i ? { ...q, label: e.target.value } : q)))}
+                        />
+                        <input
+                          className="pref-add"
+                          value={p.add}
+                          placeholder="追加到提示词的描述"
+                          onChange={(e) => setImgPrefs((arr) => arr.map((q, j) => (j === i ? { ...q, add: e.target.value } : q)))}
+                        />
+                        <button
+                          type="button"
+                          className="pref-del"
+                          title="删除该偏好"
+                          onClick={() => setImgPrefs((arr) => arr.filter((_, j) => j !== i))}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="pref-add-btn"
+                      onClick={() => setImgPrefs((arr) => [...arr, { emoji: "✨", label: "新偏好", add: "" }])}
+                    >
+                      ➕ 增加偏好
+                    </button>
+                  </div>
+                )}
               </div>
               {imgErr && <p className="msg err" style={{ whiteSpace: "pre-wrap" }}>{imgErr}</p>}
             </div>
