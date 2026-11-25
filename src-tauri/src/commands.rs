@@ -620,6 +620,16 @@ pub fn reveal_in_os(app: tauri::AppHandle, path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 用系统默认程序打开文件（v0.28：文件夹树媒体文件右键「打开媒体」）
+#[tauri::command]
+pub fn open_path_default(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_path(path, None::<&str>)
+        .map_err(|e| format!("打开失败：{}", e))?;
+    Ok(())
+}
+
 // ---------- GitHub 云备份（私有 Gist，v0.20） ----------
 
 fn github_client() -> Result<reqwest::Client, String> {

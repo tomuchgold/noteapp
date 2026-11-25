@@ -3,7 +3,7 @@
  *  1. 搜索结果面板：结果面板按钮、行内容列表、命中高亮、点击跳行
  *  2. 标注导航面板：右键标注后列表出现、点击跳转、删除
  *  3. 分屏：按钮开启、两个编辑器、选择文件、关闭
- *  4. 打印按钮存在（不真正调起打印）
+ *  4. 打印按钮存在（v0.28 起归入预览面板，不真正调起打印）
  */
 import { chromium } from "/root/.nvm/versions/node/v22.13.1/lib/node_modules/playwright/index.mjs";
 import { createServer } from "vite";
@@ -154,9 +154,12 @@ await page.locator(".editor-split-head button", { hasText: "×" }).click();
 await page.waitForTimeout(200);
 check("分屏可关闭", (await page.locator(".editor-split").count()) === 0);
 
-// ---------- 4. 打印按钮 ----------
-const printBtn = page.locator(".menubar button", { hasText: "打印" });
-check("菜单栏有打印按钮", (await printBtn.count()) === 1);
+// ---------- 4. 打印按钮（v0.28 起归入预览面板） ----------
+const previewBtn = page.locator(".menubar button", { hasText: "预览" }).first();
+await previewBtn.click();
+await page.waitForTimeout(400);
+check("预览面板有打印按钮", (await page.locator(".preview-side .preview-actions button", { hasText: "打印" }).count()) === 1);
+await page.locator(".preview-side .preview-actions button", { hasText: "关闭" }).click();
 
 await browser.close();
 await server.close();

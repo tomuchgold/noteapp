@@ -45,15 +45,17 @@ interface Props {
   content: string;
   languagePath: string | null;
   onChange: (value: string) => void;
-  onCursor: (line: number, col: number, selected: number, selectedText?: string) => void;
-  /** 外部请求触发（Ctrl+F、宏回放、AI 写回、插入表格/文本） */
-  actionSignal: { type: string; n: number; items?: MacroItem[]; text?: string } | null;
+  onCursor: (line: number, col: number, selected: number, selectedText?: string, head?: number) => void;
+  /** 外部请求触发（Ctrl+F、宏回放、AI 写回、插入表格/文本）；pos 为目标位置（AI 回写到触发时的文件位置，v0.28） */
+  actionSignal: { type: string; n: number; items?: MacroItem[]; text?: string; pos?: { from: number; to: number } } | null;
+  /** 信号处理完毕（App 收到后清空，避免 Editor 重建时重放） */
+  onSignalDone?: () => void;
   /** 编辑器样式设置 */
   settings: EditorSettings;
   /** Ctrl/⌘ + 滚轮缩放字体（dir: 1 放大 / -1 缩小） */
   onZoom?: (dir: 1 | -1) => void;
-  /** 选中文本后右键触发的 AI 动作（custom 时由上层弹指令输入） */
-  onAiAction?: (action: AiAction, text: string) => void;
+  /** 选中文本后右键触发的 AI 动作（custom 时由上层弹指令输入）；pos 为选区位置（AI 回写定位用） */
+  onAiAction?: (action: AiAction, text: string, pos?: { from: number; to: number }) => void;
   /** 是否已配置 AI（未配置时菜单提示去设置） */
   aiReady?: boolean;
   /** 打开 AI 设置 */
@@ -345,6 +347,7 @@ export default function Editor({
   onAiAction,
   aiReady,
   onOpenAiSettings,
+  onSignalDone,
   readOnly,
   columnMode,
   annotations = [],
@@ -367,7 +370,7 @@ export default function Editor({
   const onZoomRef = useRef(onZoom);
   const snippetsRef = useRef(snippets);
   snippetsRef.current = snippets;
-  const [aiMenu, setAiMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [aiMenu, setAiMenu] = useState<{ x: number; y: number; text: string; from?: number; to?: number } | null>(null);
   const [noteInput, setNoteInput] = useState<{ text: string; from: number; to: number; x: number; y: number } | null>(null);
   const switchingRef = useRef(false);
 
@@ -458,7 +461,8 @@ export default function Editor({
                 line.number,
                 sel.head - line.from + 1,
                 sel.to - sel.from,
-                sel.from !== sel.to ? u.state.doc.sliceString(sel.from, sel.to) : ""
+                sel.from !== sel.to ? u.state.doc.sliceString(sel.from, sel.to) : "",
+                sel.head
               );
             }
           }),
@@ -711,7 +715,7 @@ export default function Editor({
           selection: { anchor: from + out.length },
           scrollIntoView: true,
         });
-      } else if (["sort", "sort-desc", "dedupe", "trim"].includes(kind)) {
+      } else if (["sort", "sort-desc", "dedupe", "trim", "remove-blank", "add-blank"].includes(kind)) {
         const from = hasSel ? view.state.doc.lineAt(sel.from).from : 0;
         const to = hasSel ? view.state.doc.lineAt(sel.to).to : view.state.doc.length;
         const lines: string[] = view.state.doc.sliceString(from, to).split("\n");
@@ -719,6 +723,16 @@ export default function Editor({
         if (kind === "sort") out = [...lines].sort((a: string, b: string) => a.localeCompare(b, "zh"));
         else if (kind === "sort-desc") out = [...lines].sort((a: string, b: string) => b.localeCompare(a, "zh"));
         else if (kind === "dedupe") out = Array.from(new Set<string>(lines));
+        else if (kind === "remove-blank") out = lines.filter((l) => l.trim() !== "");
+        else if (kind === "add-blank") {
+          // v0.28：每个硬回车行之间插入一个空行（已有空行不重复追加）
+          out = [] as string[];
+          lines.forEach((l, i) => {
+            out.push(l);
+            const next = lines[i + 1];
+            if (next !== undefined && l.trim() !== "" && next.trim() !== "") out.push("");
+          });
+        }
         else out = lines.map((l) => l.trim());
         view.dispatch({
           changes: { from, to, insert: out.join("\n") },
@@ -751,9 +765,23 @@ export default function Editor({
       });
     } else if (actionSignal.type === "ai-replace" && actionSignal.text !== undefined) {
       const sel = view.state.selection.main;
+      // v0.28：带 pos 时写回 AI 触发时记录的位置（期间编辑过文档则夹取到合法区间）
+      const pos = actionSignal.pos;
+      const len = view.state.doc.length;
+      const from = pos ? Math.max(0, Math.min(pos.from, len)) : sel.from;
+      const to = pos ? Math.max(from, Math.min(pos.to, len)) : sel.to;
       view.dispatch({
-        changes: { from: sel.from, to: sel.to, insert: actionSignal.text },
-        selection: { anchor: sel.from + actionSignal.text.length },
+        changes: { from, to, insert: actionSignal.text },
+        selection: { anchor: from + actionSignal.text.length },
+        scrollIntoView: true,
+      });
+    } else if (actionSignal.type === "ai-insert-at" && actionSignal.text !== undefined && actionSignal.pos) {
+      // v0.28：插入到记录的位置（生图/AI 期间切换文件也不丢位置）
+      const len = view.state.doc.length;
+      const at = Math.max(0, Math.min(actionSignal.pos.to, len));
+      view.dispatch({
+        changes: { from: at, insert: actionSignal.text },
+        selection: { anchor: at + actionSignal.text.length },
         scrollIntoView: true,
       });
     } else if (actionSignal.type === "ai-insert" && actionSignal.text !== undefined) {
@@ -777,6 +805,8 @@ export default function Editor({
     } else if (actionSignal.type === "goto") {
       // 跳到行（在 App 中解析）
     }
+    // v0.28：一次性信号处理完毕 → 通知上层清空（Editor 重建时不会重放）
+    onSignalDone?.();
   }, [actionSignal]);
 
   /** 光标/选区命中的已有标注 */
@@ -815,10 +845,12 @@ export default function Editor({
     const text = sel.empty ? cached?.text ?? "" : view.state.sliceDoc(sel.from, sel.to);
     if (!sel.empty && !text.trim()) return;
     e.preventDefault();
+    const pos = sel.empty && cached ? { from: cached.from, to: cached.to } : { from: sel.from, to: sel.to };
     setAiMenu({
       x: Math.min(e.clientX, window.innerWidth - 230),
       y: Math.min(e.clientY, window.innerHeight - 360),
       text,
+      ...pos,
     });
   }
 
@@ -979,7 +1011,8 @@ export default function Editor({
                   title={a.hint}
                   onClick={() => {
                     setAiMenu(null);
-                    onAiAction?.(a.id, aiMenu.text);
+                    // v0.28：带上触发时的选区位置，AI 完成后回到该位置写回（期间切换文件也不丢）
+                    onAiAction?.(a.id, aiMenu.text, aiMenu.from !== undefined ? { from: aiMenu.from, to: aiMenu.to ?? aiMenu.from } : undefined);
                   }}
                 >
                   {a.label}

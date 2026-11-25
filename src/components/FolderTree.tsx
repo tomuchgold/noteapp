@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listDir, type DirEntryInfo } from "../lib/files";
+import { resolveMediaSrc } from "../lib/mediaView";
+
+const TREE_IMG_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
+const TREE_MEDIA_EXT = new Set([
+  ...TREE_IMG_EXT,
+  "mp3", "wav", "ogg", "flac", "m4a", "aac", "opus",
+  "mp4", "webm", "mov", "avi", "mkv", "m4v",
+]);
+
+function extOfPath(p: string): string {
+  const name = p.split(/[\\/]/).pop() ?? "";
+  return (name.includes(".") ? name.split(".").pop()! : "").toLowerCase();
+}
 
 interface Props {
   /** 打开的文件夹根路径；null 时显示引导 */
@@ -20,6 +33,8 @@ interface Props {
   onOpenAll: (dir: string) => void;
   /** 打开某文件所在的文件夹（设为目录树根） */
   onOpenFolderOf: (path: string) => void;
+  /** 用系统默认程序打开媒体文件（v0.28：右键「打开媒体」） */
+  onOpenMedia?: (path: string) => void;
 }
 
 const FOLDER_KEY = "notepp.folder";
@@ -62,6 +77,7 @@ export default function FolderTree({
   onReveal,
   onOpenAll,
   onOpenFolderOf,
+  onOpenMedia,
 }: Props) {
   const [entries, setEntries] = useState<DirEntryInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +85,9 @@ export default function FolderTree({
   const [children, setChildren] = useState<Record<string, DirEntryInfo[]>>({});
   const [loading, setLoading] = useState(false);
   const [menu, setMenu] = useState<CtxMenu | null>(null);
+  /** 悬停小预览（v0.28：图片显示缩略图，音视频显示图标提示） */
+  const [hover, setHover] = useState<{ x: number; y: number; path: string; img: boolean } | null>(null);
+  const hoverTimer = useRef<number | null>(null);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
   const prevRootRef = useRef<string | null>(null);
@@ -178,6 +197,7 @@ export default function FolderTree({
   const openMenu = (e: React.MouseEvent, target: DirEntryInfo | null) => {
     e.preventDefault();
     e.stopPropagation();
+    setHover(null);
     setMenu({
       x: Math.min(e.clientX, window.innerWidth - 170),
       y: Math.min(e.clientY, window.innerHeight - 210),
@@ -185,9 +205,28 @@ export default function FolderTree({
     });
   };
 
+  /** 媒体文件悬停：延迟 350ms 弹小预览（图片缩略图），移开/右键即隐藏 */
+  const onItemEnter = (e: React.MouseEvent, entry: DirEntryInfo) => {
+    if (entry.is_dir) return;
+    const ext = extOfPath(entry.path);
+    const isImg = TREE_IMG_EXT.has(ext);
+    if (!TREE_MEDIA_EXT.has(ext)) return;
+    const x = Math.min(e.clientX + 16, window.innerWidth - 190);
+    const y = Math.min(e.clientY + 8, window.innerHeight - 160);
+    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = window.setTimeout(() => setHover({ x, y, path: entry.path, img: isImg }), 350);
+  };
+  const onItemLeave = () => {
+    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    setHover(null);
+  };
+
   const renderItemMenu = (t: DirEntryInfo) => (
     <>
       {!t.is_dir && <button onClick={() => { setMenu(null); onOpenFile(t.path); }}>打开</button>}
+      {!t.is_dir && TREE_MEDIA_EXT.has(extOfPath(t.path)) && (
+        <button onClick={() => { setMenu(null); onOpenMedia?.(t.path); }}>🖼️ 打开媒体（系统默认程序）</button>
+      )}
       {!t.is_dir && <button onClick={() => { setMenu(null); onOpenFolderOf(t.path); }}>📂 打开所在文件夹</button>}
       {t.is_dir && <button onClick={() => { setMenu(null); onCreateFile(t.path); }}>新建文件</button>}
       {t.is_dir && <button onClick={() => { setMenu(null); onCreateFolder(t.path); }}>新建文件夹</button>}
@@ -223,6 +262,8 @@ export default function FolderTree({
             style={{ paddingLeft: 8 + depth * 14 }}
             onClick={() => (e.is_dir ? toggle(e) : onOpenFile(e.path))}
             onContextMenu={(ev) => openMenu(ev, e)}
+            onMouseEnter={(ev) => onItemEnter(ev, e)}
+            onMouseLeave={onItemLeave}
             title={e.path}
           >
             <span className="tree-caret">{e.is_dir ? (open ? "▾" : "▸") : ""}</span>
@@ -287,6 +328,21 @@ export default function FolderTree({
       {menu && (
         <div className="context-menu folder-context-menu" style={{ display: "block", left: menu.x, top: menu.y }}>
           {menu.target ? renderItemMenu(menu.target) : renderRootMenu()}
+        </div>
+      )}
+
+      {hover && (
+        <div className="tree-hover-preview" style={{ left: hover.x, top: hover.y }}>
+          {hover.img ? (
+            <img
+              src={resolveMediaSrc(hover.path, null)}
+              alt=""
+              onError={(ev) => { (ev.target as HTMLImageElement).parentElement?.classList.add("broken"); }}
+            />
+          ) : (
+            <div className="hp-media">🎵🎬 音视频文件</div>
+          )}
+          <div className="hp-name">{hover.path.split(/[\\/]/).pop()}</div>
         </div>
       )}
     </div>

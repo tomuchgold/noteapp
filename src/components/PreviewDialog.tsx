@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { markdownToHtml, enhanceMarkdownDom, EXPORT_EXTRAS_HEAD } from "../lib/markdown";
 
 interface Props {
   /** 文档名（导出 HTML 默认文件名） */
   title: string;
-  /** markdown 源文本 */
+  /** markdown 源文本（实时传入，编辑即刷新） */
   source: string;
   /** 正文字号 px（含缩放，导出大字打印用） */
   fontSize?: number;
@@ -12,6 +12,8 @@ interface Props {
   mediaDir?: string | null;
   /** 导出 HTML（Tauri 内走系统保存对话框；缺省用浏览器下载） */
   onExportHtml?: (html: string) => void;
+  /** 打印 / 导出 PDF（v0.28：打印归入预览面板） */
+  onPrint?: () => void;
   onClose: () => void;
 }
 
@@ -58,8 +60,18 @@ export function exportHtmlPayload(
   return buildHtmlDoc(body, title, fontSize);
 }
 
-export default function PreviewDialog({ title, source, fontSize = 14, mediaDir = null, onExportHtml, onClose }: Props) {
+/** v0.28：右侧贴边实时预览面板（编辑即刷新），支持全屏；打印 / 导出 HTML 收纳在面板里 */
+export default function PreviewDialog({
+  title,
+  source,
+  fontSize = 14,
+  mediaDir = null,
+  onExportHtml,
+  onPrint,
+  onClose,
+}: Props) {
   const isMarkdown = /\.(md|markdown|txt)$/i.test(title);
+  const [full, setFull] = useState(false);
   const html = useMemo(() => {
     try {
       if (isMarkdown) return markdownToHtml(source, { mediaDir });
@@ -69,7 +81,7 @@ export default function PreviewDialog({ title, source, fontSize = 14, mediaDir =
     } catch (e) {
       return `<p>渲染失败：${String(e)}</p>`;
     }
-  }, [source, isMarkdown]);
+  }, [source, isMarkdown, mediaDir]);
 
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -93,19 +105,25 @@ export default function PreviewDialog({ title, source, fontSize = 14, mediaDir =
   };
 
   return (
-    <div className="modal-mask" onClick={onClose}>
-      <div className="modal preview" onClick={(e) => e.stopPropagation()}>
-        <div className="preview-head">
-          <h3>Markdown 预览 — {title}</h3>
-          <div className="preview-actions">
-            <button onClick={exportHtml} title="导出带样式的 HTML，可直接浏览器打印为 PDF">
-              导出 HTML
+    <aside className={`preview-side ${full ? "full" : ""}`}>
+      <div className="preview-head">
+        <h3>{full ? "" : "实时预览 — "}{title}</h3>
+        <div className="preview-actions">
+          <button onClick={() => setFull((v) => !v)} title={full ? "退出全屏" : "全屏预览"}>
+            {full ? "⧉ 还原" : "⛶ 全屏"}
+          </button>
+          {onPrint && (
+            <button onClick={onPrint} title="打印 / 导出 PDF（打印对话框里选「另存为 PDF」）">
+              🖨️ 打印
             </button>
-            <button className="primary" onClick={onClose}>关闭</button>
-          </div>
+          )}
+          <button onClick={exportHtml} title="导出带样式的 HTML，可直接浏览器打印为 PDF">
+            导出 HTML
+          </button>
+          <button className="primary" onClick={onClose}>关闭</button>
         </div>
-        <div className="markdown-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: html }} />
       </div>
-    </div>
+      <div className="markdown-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: html }} />
+    </aside>
   );
 }

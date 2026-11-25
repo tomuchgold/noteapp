@@ -93,6 +93,7 @@ pub fn run() {
             commands::rename_path,
             commands::delete_path,
             commands::reveal_in_os,
+            commands::open_path_default,
             commands::gist_upload,
             commands::gist_download,
             opened_urls,

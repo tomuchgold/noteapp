@@ -82,6 +82,7 @@ import {
   renamePath,
   deletePath,
   revealInOS,
+  openPathDefault,
   drainOpenedPaths,
   listDir,
   pickMediaDialog,
@@ -169,6 +170,7 @@ export default function App() {
     n: number;
     items?: MacroItem[];
     text?: string;
+    pos?: { from: number; to: number };
   } | null>(null);
   const [diff, setDiff] = useState<{ aText: string; bText: string; aName: string; bName: string } | null>(null);
   const [diffDialog, setDiffDialog] = useState(false);
@@ -262,18 +264,27 @@ export default function App() {
     result: string;
     model?: string;
     tokens?: number;
+    /** v0.28：触发时的文件与选区位置——结果写回原文件原位置（期间切换文件也不丢） */
+    target?: { tabId: string | null; pos?: { from: number; to: number } };
   } | null>(null);
-  const [aiCustom, setAiCustom] = useState<{ source: string } | null>(null);
+  const [aiCustom, setAiCustom] = useState<{ source: string; pos?: { from: number; to: number } } | null>(null);
   /** v0.27：AI 面板收起到后台（不阻塞编辑，状态栏点击恢复） */
   const [aiMin, setAiMin] = useState(false);
+  /** v0.28：待写回的 AI 结果（等目标标签激活后经 actionSignal 落到编辑器） */
+  const [pendingWrite, setPendingWrite] = useState<{
+    mode: "ai-replace" | "ai-insert" | "ai-insert-at";
+    text: string;
+    tabId: string | null;
+    pos?: { from: number; to: number };
+  } | null>(null);
   useEffect(() => saveAiConfig(aiConfig), [aiConfig]);
   const aiReady = isConfigured(aiConfig);
 
   const runAi = useCallback(
-    async (action: AiAction, source: string, custom?: string) => {
+    async (action: AiAction, source: string, custom?: string, target?: { tabId: string | null; pos?: { from: number; to: number } }) => {
       const title = AI_ACTIONS.find((a) => a.id === action)?.label ?? "AI 操作";
       setAiMin(false);
-      setAiJob({ title, action, source, custom, loading: true, error: null, result: "" });
+      setAiJob({ title, action, source, custom, loading: true, error: null, result: "", target });
       try {
         const res = await runAiActionStream(aiConfig, action, source, custom, (delta) => {
           setAiJob((j) => (j ? { ...j, loading: false, result: (j.result ?? "") + delta } : j));
@@ -291,18 +302,19 @@ export default function App() {
   );
 
   const handleAiAction = useCallback(
-    (action: AiAction, text: string) => {
+    (action: AiAction, text: string, pos?: { from: number; to: number }) => {
       if (!aiReady) {
         setAiSettingsOpen(true);
         return;
       }
       if (action === "custom") {
-        setAiCustom({ source: text });
+        setAiCustom({ source: text, pos });
         return;
       }
-      void runAi(action, text);
+      // v0.28：记录触发文件与选区位置，AI 完成后写回原处
+      void runAi(action, text, undefined, { tabId: activeId, pos });
     },
-    [aiReady, runAi]
+    [aiReady, runAi, activeId]
   );
 
   // ---------- 列编辑模式 ----------
@@ -335,12 +347,48 @@ export default function App() {
     void doCheckUpdate();
   }, [doCheckUpdate]);
 
-  const writeAiText = useCallback((mode: "ai-replace" | "ai-insert", text: string) => {
-    actionCount.current += 1;
-    setActionSignal({ type: mode, n: actionCount.current, text });
-    setAiJob(null);
-    setAiMin(false);
-  }, []);
+  /** v0.28：AI 结果写回——切回触发时的文件并写回记录的位置（无 target 时按当前选中/光标） */
+  const writeAiText = useCallback(
+    (mode: "ai-replace" | "ai-insert", text: string) => {
+      const t = aiJob?.target;
+      setAiJob(null);
+      setAiMin(false);
+      setPendingWrite({ mode, text, tabId: t?.tabId ?? activeId, pos: t?.pos });
+    },
+    [aiJob, activeId]
+  );
+
+  // pendingWrite：v0.28 直接对目标 tab 的 content 做字符串拼接写回（pos 即文档偏移），
+  // 不再经 actionSignal——彻底避开切标签 remount / 信号覆盖竞态；Editor 会经 content prop 自动同步
+  useEffect(() => {
+    if (!pendingWrite) return;
+    const pw = pendingWrite;
+    if (pw.tabId && activeId !== pw.tabId) {
+      setActiveId(pw.tabId); // v0.28：自动切回触发时的文件
+      return;
+    }
+    const tid = pw.tabId ?? activeId;
+    setPendingWrite(null);
+    if (!tid) return;
+    setTabs((ts) =>
+      ts.map((t) => {
+        if (t.id !== tid) return t;
+        const c = t.content ?? "";
+        let next: string;
+        if (pw.mode === "ai-replace") {
+          const from = Math.max(0, Math.min(pw.pos?.from ?? 0, c.length));
+          const to = Math.max(from, Math.min(pw.pos?.to ?? from, c.length));
+          next = c.slice(0, from) + pw.text + c.slice(to);
+        } else {
+          // ai-insert / ai-insert-at：无位置时追加到文末，有位置时插入到光标处
+          const at = Math.max(0, Math.min(pw.pos?.from ?? c.length, c.length));
+          const nl = at > 0 && at < c.length && c[at - 1] !== "\n" && !pw.text.startsWith("\n") ? "\n" : "";
+          next = c.slice(0, at) + nl + pw.text + c.slice(at);
+        }
+        return { ...t, content: next, dirty: true };
+      })
+    );
+  }, [pendingWrite, activeId]);
 
   useEffect(() => saveLibrary(library), [library]);
   useEffect(() => saveCategories(categories), [categories]);
@@ -615,6 +663,8 @@ export default function App() {
 
   /** 编辑器当前选中文本（Ctrl/F 自动带入用；CodeMirror 状态来源，比 DOM selection 可靠） */
   const selectionTextRef = useRef("");
+  /** 当前编辑器光标偏移（AI/生图触发时记录位置用，v0.28） */
+  const cursorHeadRef = useRef<number | null>(null);
 
   /** 打开查找栏（带入选中文本） */
   const openFind = useCallback(() => {
@@ -763,11 +813,15 @@ export default function App() {
   }, []);
   // 切换标签时恢复该文件的光标位置（多文件固有行为：每个标签停在各自上次的位置；
   // 未保存草稿同样适用——按标签 id 从内存恢复）
+  // v0.28：dispatch 延后一拍——避免与 pendingWrite（AI 写回切标签）在同一批 effects 里
+  // setActionSignal 相互覆盖（同为一次性信号 state，后写获胜）
   useEffect(() => {
     const t = tabs.find((x) => x.id === activeId);
     if (!t) return;
     const saved = t.path ? loadCursorPos(t.path) : draftCursorRef.current.get(t.id) ?? null;
-    if (saved) jumpToOutline(saved.line);
+    if (!saved) return;
+    const timer = window.setTimeout(() => jumpToOutline(saved.line), 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -950,6 +1004,9 @@ export default function App() {
       setImgErr("生成的图片要保存到文档旁 media/ 目录，当前文档尚未保存。\n请先用 Ctrl+S 保存文档，再生成。");
       return;
     }
+    // v0.28：记住触发的文件与光标位置——生成期间切换文件，完成后仍插回原处
+    const targetTabId = activeId;
+    const targetHead = cursorHeadRef.current;
     setImgGenerating(true);
     setImgErr(null);
     setImgDone(null);
@@ -973,7 +1030,14 @@ export default function App() {
       const d = new Date();
       const p2 = (n: number) => String(n).padStart(2, "0");
       const stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
-      insertText(`\n![ai-image-${stamp}](${url})\n`);
+      const snippet = `\n![ai-image-${stamp}](${url})\n`;
+      // v0.28：经 pendingWrite 写回记录的文件与位置（期间切换了文件也能插回原处）
+      setPendingWrite({
+        mode: "ai-insert-at",
+        text: snippet,
+        tabId: targetTabId,
+        pos: { from: targetHead ?? 0, to: targetHead ?? 0 },
+      });
       setImgDone("图片已插入到光标处");
       window.setTimeout(() => setImgDone(null), 6000);
     } catch (e) {
@@ -981,7 +1045,7 @@ export default function App() {
     } finally {
       setImgGenerating(false);
     }
-  }, [imgPromptText, aiConfig, insertText, activeTab, folderRoot, isUnderFolderRoot]);
+  }, [imgPromptText, aiConfig, insertText, activeTab, activeId, folderRoot, isUnderFolderRoot]);
 
   // v0.27：AI/生图任务在状态栏的汇总提示（不阻塞编辑，点击回到面板）
   const aiStatusPill: { state: "running" | "done" | "error"; label: string } | null = useMemo(() => {
@@ -1739,6 +1803,8 @@ export default function App() {
       case "transform-sort-desc": runTransform("sort-desc"); break;
       case "transform-dedupe": runTransform("dedupe"); break;
       case "transform-trim": runTransform("trim"); break;
+      case "transform-remove-blank": runTransform("remove-blank"); break;
+      case "transform-add-blank": runTransform("add-blank"); break;
       default: break;
     }
   }, [
@@ -1979,6 +2045,8 @@ export default function App() {
     { id: "transform-sort-desc", label: "行排序 Z→A" },
     { id: "transform-dedupe", label: "去除重复行" },
     { id: "transform-trim", label: "去除行首尾空格" },
+    { id: "transform-remove-blank", label: "去除空行" },
+    { id: "transform-add-blank", label: "增加空行" },
   ];
 
   const transformDrop = (
@@ -2023,8 +2091,7 @@ export default function App() {
     { ico: "📊", txt: "表格", title: "在光标处插入 Markdown 表格", disabled: !activeTab, onClick: () => setTableOpen(true) },
     { ico: "🖼️", txt: "媒体", title: "插入媒体/附件：选择图片、音频、视频或任意文件，按设置的归档策略插入引用（右键编辑区也可插入）", disabled: !activeTab, onClick: () => void pickAndInsertMedia() },
     { ico: imgGenerating ? "⏳" : "🎨", txt: imgGenerating ? "生图…" : "生图", title: "AI 生图：弹窗输入提示词，生成后插入到光标处（需在 AI 设置中填好生图模型）", disabled: !activeTab || imgGenerating, onClick: () => void handleImageGen() },
-    { ico: "👁️", txt: "预览", title: "Markdown 预览（GFM）+ 导出带样式 HTML；非 Markdown 文件按纯文本预览", disabled: !activeTab, on: previewOpen, onClick: () => setPreviewOpen(true) },
-    { ico: "🖨️", txt: "打印", title: "打印 / 导出 PDF（按当前缩放字号；打印对话框里选「另存为 PDF」）", disabled: !activeTab, cls: "menubar-secondary", onClick: doPrint },
+    { ico: "👁️", txt: "预览", title: "实时预览：贴边右侧面板，编辑即刷新；含全屏、打印、导出 HTML（v0.28）", disabled: !activeTab, on: previewOpen, onClick: () => setPreviewOpen((v) => !v) },
     { ico: "🖍️", txt: "标注", title: "标注导航：当前文件所有划线/高亮/备注列表，点击跳转", disabled: !activeTab, on: annoOpen, onClick: () => setAnnoOpen((v) => !v) },
     { ico: "📑", txt: "目录", title: "大纲目录：解析当前文件 Markdown 标题（#/##/###，不限扩展名），点击跳转", disabled: !activeTab, on: outlineOpen, onClick: () => setOutlineOpen((v) => !v) },
     { ico: "↔️", txt: "分屏", title: "分屏对照：左右同时查看两个文件（再次点击关闭）", on: !!splitId, onClick: toggleSplit },
@@ -2136,6 +2203,7 @@ export default function App() {
               onReveal={revealTreePath}
               onOpenAll={openAllInDir}
               onOpenFolderOf={openFolderOf}
+              onOpenMedia={(p) => void openPathDefault(p).catch((e) => alert(`打开媒体失败：${e}`))}
             />
           </Sidebar>
         )}
@@ -2231,12 +2299,14 @@ export default function App() {
               content={activeTab.content}
               languagePath={activeTab.path}
               onChange={(v) => updateTab(activeTab.id, { content: v, dirty: true })}
-              onCursor={(line, col, selected, selText) => {
+              onCursor={(line, col, selected, selText, head) => {
                 setCursor({ line, col, selected });
                 selectionTextRef.current = selText ?? "";
+                cursorHeadRef.current = head ?? cursorHeadRef.current;
                 if (activeTab.path) saveCursorPos(activeTab.path, line, col);
                 else draftCursorRef.current.set(activeTab.id, { line, col });
               }}
+              onSignalDone={() => setActionSignal(null)}
               actionSignal={actionSignal}
               settings={editorSettings}
               onZoom={zoomEditor}
@@ -2510,6 +2580,7 @@ export default function App() {
           fontSize={effectiveFontSize(editorSettings)}
           mediaDir={activeTab.path ? dirName(activeTab.path) : null}
           onExportHtml={exportPreviewHtml}
+          onPrint={doPrint}
           onClose={() => setPreviewOpen(false)}
         />
       )}
@@ -2599,8 +2670,10 @@ export default function App() {
           onClose={() => setAiCustom(null)}
           onSubmit={(instruction) => {
             const src = aiCustom.source;
+            const pos = aiCustom.pos;
+            const tabId = activeId;
             setAiCustom(null);
-            void runAi("custom", src, instruction);
+            void runAi("custom", src, instruction, { tabId, pos });
           }}
         />
       )}

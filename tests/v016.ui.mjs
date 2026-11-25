@@ -84,7 +84,7 @@ check("菜单栏有变换按钮", (await page.locator(".menubar button", { hasTe
 await page.locator(".menubar button", { hasText: "变换" }).click();
 await page.waitForTimeout(120);
 const tmItems = (await page.locator(".transform-menu button").allInnerTexts()).map((s) => s.trim());
-check("变换菜单含 7 个功能项", tmItems.length === 7, JSON.stringify(tmItems));
+check("变换菜单含 9 个功能项", tmItems.length === 9, JSON.stringify(tmItems));
 
 // 选区转大写
 await page.locator(".menubar button", { hasText: "打开" }).first().click();

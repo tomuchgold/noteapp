@@ -191,6 +191,11 @@ export function revealInOS(path: string): Promise<void> {
   return invoke("reveal_in_os", { path });
 }
 
+/** 用系统默认程序打开文件（v0.28：文件夹树媒体右键「打开媒体」） */
+export function openPathDefault(path: string): Promise<void> {
+  return invoke("open_path_default", { path });
+}
+
 /**
  * 取走系统传递过来的待打开路径（文件关联/单实例/argv），
  * 返回后清空缓冲；浏览器/测试环境返回空数组。

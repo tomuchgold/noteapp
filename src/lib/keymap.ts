@@ -44,6 +44,8 @@ export const BUILTIN_COMMANDS: CommandDef[] = [
   { id: "transform-sort-desc", name: "行排序 Z→A", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）按字典序降序排序" },
   { id: "transform-dedupe", name: "去除重复行", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）去除相邻重复之外的重复行" },
   { id: "transform-trim", name: "去除行首尾空格", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）去掉每行首尾的空白" },
+  { id: "transform-remove-blank", name: "去除空行", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）删掉所有空行（含纯空格行）" },
+  { id: "transform-add-blank", name: "增加空行", category: "编辑插入", defaultKey: "", desc: "对选中行（无选中则全文）在每个硬回车行之间插入一个空行（已有空行不重复加）" },
 ];
 
 const KEY = "notepp.keymap-bindings";

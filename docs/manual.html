@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NotePP 功能手册 — v0.27.0</title>
+<title>NotePP 功能手册 — v0.28.0</title>
 <meta name="description" content="NotePP 功能使用手册：文件与标签、编辑体验、主题外观、查找替换、Markdown、对比预览、标注、宏、AI 辅助与系统便捷功能。">
 <link rel="icon" href="assets/icon.png">
 <style>
@@ -152,7 +152,7 @@
   <div class="wrap">
     <a class="back" href="index.html">← 返回首页</a>
     <div class="logo">Note<span>PP</span><span class="sub">功能手册</span></div>
-    <span class="ver-badge">v0.27.0</span>
+    <span class="ver-badge">v0.28.0</span>
     <div class="search-box">
       <input id="manual-search" type="search" placeholder="搜索功能：列编辑 / 主题 / 宏 / AI …" autocomplete="off" aria-label="搜索手册功能">
       <span class="search-count" id="search-count"></span>
@@ -183,9 +183,9 @@
   <main class="content">
     <header class="hero">
       <h1>NotePP <em>功能手册</em></h1>
-      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.27.0，适用于 macOS / Windows / Linux / Android。</p>
+      <p class="sub">从文件管理到 AI 写作，一份覆盖全部功能的完整使用指南。对应版本 v0.28.0，适用于 macOS / Windows / Linux / Android。</p>
       <div class="meta">
-        <span>当前版本 <b>v0.27.0</b></span>
+        <span>当前版本 <b>v0.28.0</b></span>
         <span><b>12</b> 大功能类别</span>
         <span>技术栈 <b>Tauri 2 + React 19 + CodeMirror 6</b></span>
         <span>数据 <b>全部本地存储</b></span>
@@ -234,9 +234,16 @@
 
       <div class="feature">
         <h3><span class="ic">🖱️</span>文件夹树右键菜单</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">在目录树或空白处点击右键，可<strong>新建文件 / 新建文件夹 / 重命名 / 删除 / 在系统中显示 / 全部打开 / 切换文件夹</strong>。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">在目录树或空白处点击右键，可<strong>新建文件 / 新建文件夹 / 重命名 / 删除 / 在系统中显示 / 全部打开 / 切换文件夹</strong>；<b>v0.28 起</b>右键图片 / 音频 / 视频等媒体文件新增「🖼️ 打开媒体（系统默认程序）」。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">右键空白处作用于根目录；右键文件夹可新建或一键打开其中所有文本；双击空白处直接新建文件；<kbd>Esc</kbd> 关闭菜单。新建 <code>.md</code> 自动带标题模板，<code>.json</code> 自动带花括号骨架；删除会同步关闭已打开的对应标签。</span></div>
         <div class="path"><span class="badge">路径</span>侧栏文件夹树 → 右键</div>
+      </div>
+
+      <div class="feature">
+        <h3><span class="ic">🔍</span>媒体悬停小预览（v0.28）</h3>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">鼠标指向文件夹树中的<strong>图片</strong>时，旁边浮出小缩略图预览；音频 / 视频则显示类型标识与文件名，不用打开文件就能确认内容。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">鼠标悬停在目录树的媒体文件上约半秒即可浮出预览，移开即消失。</span></div>
+        <div class="path"><span class="badge">路径</span>侧栏文件夹树 → 悬停媒体文件</div>
       </div>
 
       <div class="feature">
@@ -245,6 +252,9 @@
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">双击文件或在「打开方式」里选 NotePP；传入的是文件夹时自动打开侧栏目录树；macOS 上 Finder 双击同样生效。</span></div>
         <div class="path"><span class="badge">路径</span>系统文件管理器 → 打开方式 → NotePP</div>
       </div>
+
+      <div class="tip"><b>macOS 提示：</b>首次安装 dmg 后如果提示「"NotePP"已损坏，无法打开」或「无法验证开发者」，在终端执行以下命令解除系统隔离标记，再打开即可（只需执行一次）：<br>
+      <code>sudo xattr -rd com.apple.quarantine /Applications/NotePP.app</code></div>
 
       <div class="feature">
         <h3><span class="ic">🫳</span>拖拽打开文件与文件夹</h3>
@@ -275,8 +285,8 @@
 
       <div class="feature">
         <h3><span class="ic">🔠</span>文字变换</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">一键完成常见文本整理：<b>转为大写 / 转为小写 / 首字母大写 / 行排序 A→Z / 行排序 Z→A / 去除重复行 / 去除行首尾空格</b>。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">选中文字后点菜单栏「🔠 变换」选择即可；<b>大小写类</b>无选中时作用于当前行，<b>排序/去重/去空格</b>无选中时作用于全文。转大写默认 <kbd>Ctrl+Alt+U</kbd>，转小写 <kbd>Ctrl+Alt+I</kbd>，均可在「快捷键设置」里改键。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">一键完成常见文本整理：<b>转为大写 / 转为小写 / 首字母大写 / 行排序 A→Z / 行排序 Z→A / 去除重复行 / 去除行首尾空格 / 去除空行 / 增加空行</b>（后两项为 v0.28 新增：去除空行删除全文空行；增加空行在每个硬回车行之间插入一个空行，已有空行不重复加）。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">选中文字后点菜单栏「🔠 变换」选择即可；<b>大小写类</b>无选中时作用于当前行，<b>排序/去重/去空格/空行</b>无选中时作用于全文。转大写默认 <kbd>Ctrl+Alt+U</kbd>，转小写 <kbd>Ctrl+Alt+I</kbd>，均可在「快捷键设置」里改键。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「🔠 变换 ▾」</div>
       </div>
 
@@ -459,7 +469,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">👁️</span>渲染预览与导出带样式 HTML</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">所见即所得的渲染预览；txt 等文本文件也按 Markdown 渲染（v0.27）；支持导出保留样式的 HTML。<b>图片 / 音频 / 视频的相对路径引用（如 <code>media/xxx.png</code>）按文档所在目录解析</b>，预览、导出 HTML、打印 PDF 中都能正常显示（v0.27 修复此前裂图问题）。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">点击菜单「预览」打开预览面板，从中导出 HTML，或直接打印成 PDF。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext"><b>v0.28 起预览贴边显示在右侧</b>，编辑时实时刷新，可与编辑器并排对照；面板右上可切换<b>全屏</b>，<b>打印 / 导出 PDF 按钮已归入预览面板</b>（菜单栏不再单独有打印项）。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「预览」→ 导出带样式 HTML</div>
       </div>
     </section>
@@ -589,7 +599,7 @@ graph LR
 
       <div class="feature">
         <h3><span class="ic">✨</span>AI 动作（选中文本右键触发）</h3>
-        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 7 个动作：<b>解释这段内容、润色改写、提炼要点、翻译成中文、翻译成英文、生成代码注释、自定义指令…</b>；回复流式显示。<b>v0.27 起 AI 完全不阻塞编辑</b>：结果面板是右下角浮窗，运行中可以继续编辑 / 切换文件；点面板右上 <b>▼</b> 收起到后台，状态栏出现「✨ 运行中 / 结果就绪」提示，点一下即可回到面板。</span></div>
+        <div class="frow"><span class="flabel">是什么</span><span class="ftext">内置 7 个动作：<b>解释这段内容、润色改写、提炼要点、翻译成中文、翻译成英文、生成代码注释、自定义指令…</b>；回复流式显示。<b>v0.27 起 AI 完全不阻塞编辑</b>：结果面板是右下角浮窗，运行中可以继续编辑 / 切换文件；点面板右上 <b>▼</b> 收起到后台，状态栏出现「✨ 运行中 / 结果就绪」提示，点一下即可回到面板。<b>v0.28 起 AI 会记住触发时的文件与选区位置</b>：运行期间就算切换到别的文件，点「替换选中 / 插入」或生图完成后，结果仍写回<b>原来的文件、原来的位置</b>（并自动切回该标签）。</span></div>
         <div class="frow"><span class="flabel">怎么用</span><span class="ftext">在编辑器中选中文字 → 右键 → 选择 AI 动作；期间可正常编辑；结果可<b>复制</b>、<b>插入光标处</b>或<b>替换原文</b>。</span></div>
         <div class="path"><span class="badge">路径</span>选中文本右键 → AI 动作</div>
       </div>
@@ -631,7 +641,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🏷️</span>版本号显示</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">设置对话框标题与菜单按钮提示中会显示当前版本号。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.27.0</code>；本手册顶部同样标注当前版本。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">打开「设置」即可看到 <code>v0.28.0</code>；本手册顶部同样标注当前版本。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「设置」标题处</div>
       </div>
 
@@ -702,7 +712,7 @@ graph LR
       <div class="feature">
         <h3><span class="ic">🎨</span>AI 生图（菜单一键生成并插入）</h3>
         <div class="frow"><span class="flabel">是什么</span><span class="ftext">菜单栏「🎨 生图」弹出<b>生图对话框</b>：提示词<b>自动预填当前选中的文字</b>（也可自己写，Ctrl+Enter 直发），生成后图片<b>落盘到文档旁 media/ 目录</b>（不再往文档里塞 base64 大字符串），插入相对引用 <code>![ai-image-时间戳](media/ai-xxx.png)</code>（<b>v0.27 起方括号用英文标识符</b>，中文提示词不再进入引用，避免破坏 Markdown 链接）。</span></div>
-        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">先在「AI 设置」选好<b>生图模型（🖼）</b>并填 Key；选中一段文字当提示词（或不选直接点生图），点「🎨 生图」→「生成（后台运行）」——<b>点下立即关窗，生成期间可以正常编辑 / 浏览</b>，完成后图片自动插入光标处，状态栏显示「生图生成中… / 🎨 图片已插入」，失败时状态栏提示点击查看人话错误。对话框里有<b>生图偏好快捷标签</b>（🧊 透明物品 / 🧻 白底产品 / 🎯 极简居中 / 🔍 高清细节）一键追加提示词。图片格式以服务商返回为准（jpg/png 自动按真实格式落盘）。文档未保存时先 Ctrl+S（落盘需要知道存哪）。</span></div>
+        <div class="frow"><span class="flabel">怎么用</span><span class="ftext">先在「AI 设置」选好<b>生图模型（🖼）</b>并填 Key；选中一段文字当提示词（或不选直接点生图），点「🎨 生图」→「生成（后台运行）」——<b>点下立即关窗，生成期间可以正常编辑 / 浏览</b>，完成后图片自动插回触发时的文件与光标位置（v0.28：期间切换文件也会切回原文件插入），状态栏显示「生图生成中… / 🎨 图片已插入」，失败时状态栏提示点击查看人话错误。对话框里有<b>生图偏好快捷标签</b>（🧊 透明物品 / 🧻 白底产品 / 🎯 极简居中 / 🔍 高清细节）一键追加提示词。图片格式以服务商返回为准（jpg/png 自动按真实格式落盘）。文档未保存时先 Ctrl+S（落盘需要知道存哪）。</span></div>
         <div class="path"><span class="badge">路径</span>菜单栏「生图」/ AI 设置 → 生图模型</div>
       </div>
 
